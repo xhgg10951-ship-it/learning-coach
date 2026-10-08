@@ -1,25 +1,23 @@
 #!/usr/bin/env python3
-"""learning-coach 进度解析与可视化。
+"""Read-only progress summaries for v2 hubs and explicitly labelled legacy files.
 
-用法:
-  python progress.py [--hub DIR] [--goal SLUG] [--today YYYY-MM-DD] [--html OUT.html] [--json]
-
-- 默认在 stdout 输出文字摘要（包括过期未完成的周目标，供 Agent 做偏离检查）。
-- --html 生成可内联嵌入对话的紧凑面板（<agent-embed>）。
-- --json 输出结构化数据。
-仅依赖 Python 标准库。
+Dates are display metadata only. No completion, mastery, delay or planning decision
+is inferred from elapsed time, checkbox totals or estimated hours.
 """
 from __future__ import annotations
 
 import argparse
 import datetime as dt
+import html
 import json
+import math
+import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 DEFAULT_HUB = Path.home() / "learning-hub"
-
 RE_STAGE = re.compile(r"^##\s+(.+?)\s*$")
 RE_MODULE = re.compile(r"^###\s+\[(.)\]\s+(S\d+-M\d+)\s+(.+?)\s*$")
 RE_HOURS = re.compile(r"预计耗时[:：]\s*([\d.]+)")
@@ -27,262 +25,348 @@ RE_MONTH = re.compile(r"^##\s+(\d{4})-(\d{2})\s*月")
 RE_WEEK = re.compile(r"^###\s+(\d{4})-W(\d{1,2})")
 RE_ITEM = re.compile(r"^\s*-\s+\[(.)\]\s+((?:W\d+-\d+)|(?:M\d+))[:：]\s*(.+?)\s*$")
 RE_SECTION = re.compile(r"^##\s+")
+LEGACY_WARNING = (
+    "legacy：按旧版模板只读解析；保留原始日期和勾选标记。"
+    "这些标记不等于能力掌握证明，不会自动迁移、顺延或推进状态。"
+)
 
 
-def read(p: Path) -> str:
-    return p.read_text(encoding="utf-8-sig") if p.exists() else ""
+class ProgressError(ValueError):
+    """A progress input cannot be summarized safely."""
+
+
+def read(path: Path) -> str:
+    return path.read_text(encoding="utf-8-sig") if path.exists() else ""
 
 
 def frontmatter(text: str) -> dict:
-    m = re.match(r"^---\s*\n(.*?)\n---", text, re.S)
+    match = re.match(r"^---\s*\n(.*?)\n---", text, re.S)
     out: dict = {}
-    if not m:
+    if not match:
         return out
-    for line in m.group(1).splitlines():
-        if ":" not in line:
-            continue
-        k, v = line.split(":", 1)
-        v = v.split("#", 1)[0].strip()
-        out[k.strip()] = v
+    for line in match.group(1).splitlines():
+        if ":" in line:
+            key, value = line.split(":", 1)
+            out[key.strip()] = value.split("#", 1)[0].strip()
     return out
 
 
 def parse_syllabus(text: str) -> list[dict]:
-    modules, stage, cur = [], "", None
+    """Preserve legacy module markers; do not interpret them as mastery."""
+    modules, stage, current = [], "", None
     for line in text.splitlines():
-        mm = RE_MODULE.match(line)
-        if mm:
-            cur = {"status": mm.group(1), "id": mm.group(2), "name": mm.group(3), "stage": stage, "hours": 0.0}
-            modules.append(cur)
+        match = RE_MODULE.match(line)
+        if match:
+            current = {"status": match.group(1), "id": match.group(2),
+                       "name": match.group(3), "stage": stage, "hours": None}
+            modules.append(current)
             continue
-        ms = RE_STAGE.match(line)
-        if ms and not line.startswith("###"):
-            stage, cur = ms.group(1), None
+        if re.match(r"^###\s+", line):
+            current = None  # Unknown headings must not lend metadata to a prior module.
             continue
-        if cur is not None:
-            mh = RE_HOURS.search(line)
-            if mh:
+        match = RE_STAGE.match(line)
+        if match and not line.startswith("###"):
+            stage, current = match.group(1), None
+            continue
+        if current is not None:
+            match = RE_HOURS.search(line)
+            if match:
                 try:
-                    cur["hours"] = float(mh.group(1))
+                    value = float(match.group(1))
+                    if math.isfinite(value):
+                        current["hours"] = value
                 except ValueError:
                     pass
     return modules
 
 
 def parse_plan(text: str) -> dict:
+    """Read historical calendar labels without comparing them to today's date."""
     months: list[dict] = []
     weeks: list[dict] = []
-    cur_month = cur_week = None
+    current_month = current_week = None
     for line in text.splitlines():
-        m = RE_MONTH.match(line)
-        if m:
-            cur_month = {"month": f"{m.group(1)}-{m.group(2)}", "items": []}
-            months.append(cur_month)
-            cur_week = None
+        match = RE_MONTH.match(line)
+        if match:
+            current_month = {"month": f"{match.group(1)}-{match.group(2)}", "items": []}
+            months.append(current_month)
+            current_week = None
             continue
-        w = RE_WEEK.match(line)
-        if w:
-            cur_week = {"year": int(w.group(1)), "week": int(w.group(2)), "label": line.lstrip("# ").strip(), "items": []}
-            weeks.append(cur_week)
+        match = RE_WEEK.match(line)
+        if match:
+            current_week = {"year": int(match.group(1)), "week": int(match.group(2)),
+                            "label": line.lstrip("# ").strip(), "items": []}
+            weeks.append(current_week)
             continue
-        if RE_SECTION.match(line):  # 其它二级标题（计划外学习/调整记录）
-            cur_month = cur_week = None
+        if RE_SECTION.match(line) or re.match(r"^###\s+", line):
+            current_month = current_week = None
             continue
-        it = RE_ITEM.match(line)
-        if it:
-            item = {"status": it.group(1), "id": it.group(2), "text": it.group(3)}
-            if cur_week is not None and item["id"].startswith("W"):
-                cur_week["items"].append(item)
-            elif cur_month is not None and item["id"].startswith("M"):
-                cur_month["items"].append(item)
+        match = RE_ITEM.match(line)
+        if match:
+            item = {"status": match.group(1), "id": match.group(2), "text": match.group(3)}
+            if current_week is not None and item["id"].startswith("W"):
+                current_week["items"].append(item)
+            elif current_month is not None and item["id"].startswith("M"):
+                current_month["items"].append(item)
     return {"months": months, "weeks": weeks}
 
 
-def parse_sessions(d: Path) -> list[dict]:
-    out = []
-    if not d.exists():
-        return out
-    for f in sorted(d.glob("*.md")):
-        fm = frontmatter(read(f))
-        date = fm.get("date") or f.name[:10]
+def parse_sessions(directory: Path, warnings: list[str] | None = None) -> list[dict]:
+    """Preserve legacy session files even when their metadata is incomplete."""
+    warnings = warnings if warnings is not None else []
+    sessions = []
+    if not directory.exists():
+        return sessions
+    if not directory.is_dir():
+        raise ProgressError(f"legacy sessions 路径不是文件夹：{directory}")
+    for path in sorted(directory.glob("*.md")):
+        metadata = frontmatter(read(path))
+        date = metadata.get("date") or path.name[:10]
         try:
             dt.date.fromisoformat(date)
         except ValueError:
-            continue
-        try:
-            minutes = int(float(fm.get("minutes", "0") or 0))
-        except ValueError:
-            minutes = 0
-        out.append({"date": date, "topic": fm.get("topic", f.stem), "minutes": minutes, "file": f.name})
-    return out
+            warnings.append(f"legacy session {path.name}：日期无法识别，保留原始值。")
+        minutes = None
+        raw_minutes = metadata.get("minutes")
+        if raw_minutes:
+            try:
+                number = float(raw_minutes)
+                if number < 0 or not math.isfinite(number):
+                    raise ValueError
+                minutes = int(number)
+            except ValueError:
+                warnings.append(f"legacy session {path.name}：minutes 无效，未计入时长。")
+        sessions.append({"date": date, "topic": metadata.get("topic", path.stem),
+                         "minutes": minutes, "file": path.name})
+    return sessions
 
 
-def analyze_goal(gdir: Path, today: dt.date) -> dict:
-    fm = frontmatter(read(gdir / "goal.md"))
-    modules = parse_syllabus(read(gdir / "syllabus.md"))
-    plan = parse_plan(read(gdir / "plan.md"))
-    sessions = parse_sessions(gdir / "sessions")
-    iy, iw, _ = today.isocalendar()
-
-    active = [m for m in modules if m["status"] != "-"]
-    done = [m for m in active if m["status"] == "x"]
-    doing = [m for m in active if m["status"] == "~"]
-    tot_h = sum(m["hours"] for m in active)
-    done_h = sum(m["hours"] for m in done)
-
-    cur_week = next((w for w in plan["weeks"] if (w["year"], w["week"]) == (iy, iw)), None)
-    overdue = []
-    for w in plan["weeks"]:
-        if (w["year"], w["week"]) < (iy, iw):
-            for it in w["items"]:
-                if it["status"] in (" ", "~"):
-                    overdue.append({**it, "week": f"{w['year']}-W{w['week']:02d}"})
-    cur_month = next((m for m in plan["months"] if m["month"] == today.strftime("%Y-%m")), None)
-    month_has_weeks = any(
-        dt.date.fromisocalendar(w["year"], w["week"], 1).strftime("%Y-%m") == today.strftime("%Y-%m")
-        for w in plan["weeks"]
-    )
-
+def analyze_goal(directory: Path, today: dt.date | None = None) -> dict:
+    """Compatibility reader for legacy goals. ``today`` never changes results."""
+    if (directory / "state.json").exists() or (directory / "tracks").exists():
+        raise ProgressError(f"{directory}：新版 Goal 必须通过 Hub 读取，不能按旧模板解析。")
+    warnings = [LEGACY_WARNING]
+    metadata = frontmatter(read(directory / "goal.md"))
+    syllabus = read(directory / "syllabus.md")
+    plan_text = read(directory / "plan.md")
+    modules = parse_syllabus(syllabus)
+    plan = parse_plan(plan_text)
+    if not (directory / "goal.md").is_file():
+        warnings.append("legacy：缺少 goal.md，目标标题使用目录名。")
+    if not (directory / "syllabus.md").is_file():
+        warnings.append("legacy：缺少 syllabus.md，模块数量未知。")
+    elif syllabus.strip() and not modules:
+        warnings.append("legacy：syllabus.md 不符合可识别的旧版模块格式，模块数量未知。")
+    if plan_text.strip() and not (plan["months"] or plan["weeks"]):
+        warnings.append("legacy：plan.md 不符合可识别的旧版计划格式，保留原文件供人工核对。")
+    module_lines = [line for line in syllabus.splitlines() if re.match(r"^###\s+\[", line)]
+    if len(module_lines) != len(modules):
+        warnings.append("legacy：部分模块标题无法解析，以下统计仅包含可识别模块，请核对原文件。")
+    plan_items = sum(len(section["items"]) for sections in plan.values() for section in sections)
+    checklist_lines = [line for line in plan_text.splitlines() if re.match(r"^\s*-\s+\[.\]", line)]
+    if len(checklist_lines) != plan_items:
+        warnings.append("legacy：部分计划条目无法解析，以下列表仅包含可识别条目，请核对原文件。")
+    for module in modules:
+        if module["status"] not in {" ", "x", "~", ">", "-"}:
+            warnings.append(f"legacy：模块 {module['id']} 的标记 {module['status']!r} 无法解释。")
+    sessions = parse_sessions(directory / "sessions", warnings)
+    active = [module for module in modules if module["status"] != "-"]
+    known_modules = bool(modules)
     return {
-        "slug": gdir.name,
-        "title": fm.get("title", gdir.name),
-        "deadline": fm.get("deadline", "none"),
-        "status": fm.get("status", "active"),
-        "weekly_hours": fm.get("weekly_hours", ""),
-        "modules": modules,
-        "module_total": len(active),
-        "module_done": len(done),
-        "module_doing": len(doing),
-        "hours_total": tot_h,
-        "hours_done": done_h,
-        "current_week": cur_week,
-        "current_month": cur_month,
-        "current_month_needs_weeks": cur_month is not None and not month_has_weeks,
-        "overdue": overdue,
-        "sessions": sessions,
+        "id": directory.name, "slug": directory.name,
+        "title": metadata.get("title", directory.name),
+        "status": metadata.get("status", "unknown"),
+        "format": "legacy", "legacy": True, "warnings": warnings,
+        "metadata": metadata, "modules": modules,
+        "module_total": len(active) if known_modules else None,
+        "module_marked_done": sum(module["status"] == "x" for module in active) if known_modules else None,
+        "module_marked_doing": sum(module["status"] == "~" for module in active) if known_modules else None,
+        "estimated_hours": (sum(module["hours"] for module in active)
+                            if known_modules and all(module["hours"] is not None for module in active)
+                            else None),
+        "plan": plan, "sessions": sessions,
     }
 
 
-def summary_text(goals: list[dict], today: dt.date) -> str:
-    iy, iw, _ = today.isocalendar()
-    lines = [f"今天 {today.isoformat()}（{iy}-W{iw:02d}）"]
-    for g in goals:
-        lines.append(f"\n## {g['title']} [{g['slug']}] status={g['status']} deadline={g['deadline']}")
-        lines.append(f"模块：已掌握 {g['module_done']}/{g['module_total']}，进行中 {g['module_doing']}；"
-                     f"学时 {g['hours_done']:.0f}/{g['hours_total']:.0f}h")
-        recent = g["sessions"][-1] if g["sessions"] else None
-        lines.append(f"学习次数：{len(g['sessions'])}；最近一次：{recent['date'] + ' ' + recent['topic'] if recent else '无'}")
-        cw = g["current_week"]
-        if cw:
-            lines.append(f"本周目标（{cw['label']}）：")
-            lines += [f"  [{i['status']}] {i['id']}: {i['text']}" for i in cw["items"]] or ["  （空）"]
+def effective_status(saved: str, parent: str) -> str:
+    """Display a parent's pause without changing saved child or terminal status."""
+    return "paused" if parent == "paused" and saved in {"pending", "active", "paused"} else saved
+
+
+def status_label(entity: dict) -> str:
+    saved, effective = entity["status"], entity["effective_status"]
+    if saved != effective:
+        return f"保存状态 {saved}；当前有效状态 {effective}（上级已暂停）"
+    return saved
+
+
+def _read_v2_goal(hub_path: Path, goal_id: str, track_id: str | None) -> dict:
+    if __package__:
+        from .learning import Hub
+    else:
+        from learning import Hub
+    hub = Hub(hub_path)
+    state = hub.get_goal(goal_id)
+    track_ids = [track_id] if track_id else [item["id"] for item in hub.list_tracks(goal_id)]
+    tracks = []
+    for selected_id in track_ids:
+        track = hub.get_track(goal_id, selected_id)
+        track_status = effective_status(track["status"], state["status"])
+        milestones = {
+            identity: {**item, "effective_status": effective_status(item["status"], track_status)}
+            for identity, item in track["milestones"].items()
+        }
+        sprints = [
+            {**item, "effective_status": effective_status(
+                item["status"], milestones[item["milestone_id"]]["effective_status"])}
+            for item in track["sprints"].values()
+        ]
+        tracks.append({
+            "id": track["id"], "title": track["title"], "status": track["status"],
+            "effective_status": track_status,
+            "milestones": list(milestones.values()), "sprints": sprints,
+        })
+    return {
+        "id": state["id"], "slug": state["id"], "title": state["title"],
+        "status": state["status"], "format": "v2", "schema_version": 2,
+        "legacy": False, "warnings": [], "tracks": tracks,
+    }
+
+
+def load_goals(hub_path: Path, goal_id: str | None = None, track_id: str | None = None) -> list[dict]:
+    if track_id and not goal_id:
+        raise ProgressError("--track 必须与 --goal 一起使用。")
+    root = hub_path / "goals"
+    if root.exists() and not root.is_dir():
+        raise ProgressError(f"目标目录不是文件夹：{root}")
+    if not root.exists() and (hub_path / "state" / "active.json").exists():
+        raise ProgressError(f"新版数据目录缺少 goals/：{hub_path}；未按空数据汇总。")
+    directories = sorted(path for path in root.iterdir() if path.is_dir()) if root.exists() else []
+    if goal_id:
+        directories = [path for path in directories if path.name == goal_id]
+        if not directories:
+            raise ProgressError(f"未找到 Goal：{goal_id}")
+    goals = []
+    for directory in directories:
+        if (directory / "state.json").exists():
+            goals.append(_read_v2_goal(hub_path, directory.name, track_id))
+        elif (directory / "tracks").exists():
+            raise ProgressError(f"新版 Goal {directory.name} 缺少 state.json；未按旧格式解析。")
+        elif any((directory / name).exists() for name in ("goal.md", "syllabus.md", "plan.md", "sessions")):
+            if track_id:
+                raise ProgressError(f"legacy Goal {directory.name} 没有 Track 结构。")
+            goals.append(analyze_goal(directory))
         else:
-            lines.append("本周目标：plan.md 中没有本周小节 → 需要细化本周/本月")
-        if g["current_month_needs_weeks"]:
-            lines.append("⚠ 本月有月目标，但还没有细化周目标")
-        if g["current_month"] is None:
-            lines.append("⚠ plan.md 中没有本月的月目标（可能需要跨月重排）")
-        if g["overdue"]:
-            lines.append(f"⚠ 过期未完成的周目标 {len(g['overdue'])} 条（需要顺延）：")
-            lines += [f"  {o['week']} [{o['status']}] {o['id']}: {o['text']}" for o in g["overdue"]]
+            raise ProgressError(f"无法识别 Goal 目录 {directory}，没有状态文件或旧版文档。")
+    return sorted(goals, key=lambda goal: goal["status"] != "active")
+
+
+def summary_text(goals: list[dict], today: dt.date) -> str:
+    lines = [f"学习进度 · 展示日期 {today.isoformat()}（日期不驱动状态）"]
+    if not goals:
+        lines.append("未找到学习目标。")
+    for goal in goals:
+        lines.append(f"\n{goal['title']} [{goal['id']}] status={goal['status']} format={goal['format']}")
+        for warning in goal["warnings"]:
+            lines.append(f"提示：{warning}")
+        if goal["legacy"]:
+            if goal["module_total"] is None:
+                lines.append("旧版模块数量：未知；请核对原始文件。")
+            else:
+                hours = f"{goal['estimated_hours']:g}h" if goal["estimated_hours"] is not None else "未知"
+                lines.append(f"旧版模块标记：勾选完成 {goal['module_marked_done']}/{goal['module_total']}，"
+                             f"进行中 {goal['module_marked_doing']}；预计总时长 {hours}。")
+                lines.extend(f"  [{module['status']}] {module['id']}: {module['name']}"
+                             for module in goal["modules"])
+            lines.append(f"旧版学习记录文件：{len(goal['sessions'])} 份。")
+            for session in goal["sessions"][-3:]:
+                minutes = f"{session['minutes']} 分钟" if session["minutes"] is not None else "时长未知"
+                lines.append(f"  {session['date']} · {session['topic']} · {minutes}")
+            for month in goal["plan"]["months"]:
+                lines.append(f"历史月份标签 {month['month']}：")
+                lines.extend(f"  [{item['status']}] {item['id']}: {item['text']}" for item in month["items"])
+            for week in goal["plan"]["weeks"]:
+                lines.append(f"历史周标签 {week['label']}：")
+                lines.extend(f"  [{item['status']}] {item['id']}: {item['text']}" for item in week["items"])
+            continue
+        lines.append("状态是已保存的用户决策与验收记录，不从数量或时长推断能力掌握。")
+        if not goal["tracks"]:
+            lines.append("尚无 Track。")
+        for track in goal["tracks"]:
+            lines.append(f"  Track {track['id']} · {track['title']} [{status_label(track)}]")
+            for field, label in (("milestones", "Milestone"), ("sprints", "Sprint")):
+                if not track[field]:
+                    lines.append(f"    尚无 {label}。")
+                for item in track[field]:
+                    parent = f" → {item['milestone_id']}" if field == "sprints" else ""
+                    lines.append(f"    {label} {item['id']}{parent} · {item['title']} [{status_label(item)}]")
+                    lines.append(f"      能力目标：{item['objective']}")
+                    lines.extend(f"      验收标准：{criterion}" for criterion in item["criteria"])
     return "\n".join(lines)
 
 
-HTML_TMPL = r"""<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
-<style>
-.cell{width:12px;height:12px;border-radius:3px;background:var(--border)}
-.bar{height:8px;border-radius:9999px;background:var(--border);overflow:hidden;display:flex}
-</style></head>
-<body class="bg-transparent text-[var(--foreground)] antialiased p-3">
-<div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
-  <div class="flex items-center justify-between gap-2 mb-3">
-    <h2 class="font-semibold text-base">📊 学习进度 <span id="today" class="text-xs text-[var(--muted-foreground)] font-normal"></span></h2>
-    <div id="tabs" class="flex gap-1 flex-wrap"></div>
-  </div>
-  <div id="body"></div>
-</div>
-<script>
-const DATA = __DATA__;
-const ICON = {" ":"⬜","~":"🟨","x":"✅",">":"↪️","-":"➖"};
-const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e;};
-document.getElementById('today').textContent = DATA.today + ' · ' + DATA.isoweek;
-let cur = 0;
-function tabs(){const t=document.getElementById('tabs');t.innerHTML='';
-  if(DATA.goals.length<2)return;
-  DATA.goals.forEach((g,i)=>{const b=el('button','text-xs px-2 py-1 rounded-md border border-[var(--border)] '+(i===cur?'bg-[var(--primary)] text-[var(--primary-foreground)]':'text-[var(--muted-foreground)]'),g.title);
-    b.onclick=()=>{cur=i;render();};t.appendChild(b);});}
-function render(){tabs();const b=document.getElementById('body');b.innerHTML='';
-  const g=DATA.goals[cur]; if(!g){b.appendChild(el('p','text-sm text-[var(--muted-foreground)]','还没有学习目标。对我说“新建学习目标”开始吧。'));return;}
-  // header
-  const h=el('div','flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--muted-foreground)] mb-2');
-  [['截止',g.deadline],['每周',g.weekly_hours?g.weekly_hours+'h':'—'],['学习次数',g.sessions.length],['累计',Math.round(g.sessions.reduce((a,s)=>a+s.minutes,0)/6)/10+'h']].forEach(([k,v])=>h.appendChild(el('span','',k+'：'+v)));
-  b.appendChild(h);
-  // module bar
-  const t=g.module_total||1, pd=g.module_done/t*100, pg=g.module_doing/t*100;
-  const row=el('div','mb-1 flex justify-between text-xs');row.appendChild(el('span','font-medium','大纲模块'));
-  row.appendChild(el('span','text-[var(--muted-foreground)]',`已掌握 ${g.module_done} · 进行中 ${g.module_doing} · 共 ${g.module_total}`));b.appendChild(row);
-  const bar=el('div','bar mb-2');const s1=el('div');s1.style.cssText=`width:${pd}%;background:var(--primary)`;const s2=el('div');s2.style.cssText=`width:${pg}%;background:var(--primary);opacity:.4`;bar.append(s1,s2);b.appendChild(bar);
-  // module chips
-  const chips=el('div','flex flex-wrap gap-1 mb-3');g.modules.forEach(m=>{const c=el('span','text-xs px-1.5 py-0.5 rounded border border-[var(--border)]',ICON[m.status]+' '+m.id);c.title=m.stage+' / '+m.name;if(m.status==='-')c.style.opacity=.5;chips.appendChild(c);});b.appendChild(chips);
-  // grid: week + heatmap
-  const grid=el('div','grid gap-4');grid.style.gridTemplateColumns='minmax(0,1fr) auto';
-  const wk=el('div');wk.appendChild(el('div','text-xs font-medium mb-1','本周目标'+(g.current_week?'（'+g.current_week.label.replace(/^\d{4}-/,'')+'）':'')));
-  const items=(g.current_week&&g.current_week.items)||[];
-  if(!items.length)wk.appendChild(el('div','text-xs text-[var(--muted-foreground)]','本周还没有目标'));
-  items.forEach(i=>{const r=el('div','text-xs flex gap-1 py-0.5');r.appendChild(el('span','',ICON[i.status]||'⬜'));const tx=el('span',i.status==='x'?'line-through text-[var(--muted-foreground)]':'',i.id+' '+i.text);r.appendChild(tx);wk.appendChild(r);});
-  if(g.overdue.length)wk.appendChild(el('div','text-xs mt-1 text-[var(--muted-foreground)]',`↪️ ${g.overdue.length} 条过期未完成，待顺延`));
-  grid.appendChild(wk);
-  // heatmap 12 weeks
-  const hm=el('div');hm.appendChild(el('div','text-xs font-medium mb-1','近 12 周'));
-  const byDay={};g.sessions.forEach(s=>{byDay[s.date]=(byDay[s.date]||0)+Math.max(s.minutes,30);});
-  const today=new Date(DATA.today+'T00:00:00');const dow=(today.getDay()+6)%7;const start=new Date(today);start.setDate(today.getDate()-dow-77);
-  const cg=el('div');cg.style.cssText='display:grid;grid-template-rows:repeat(7,12px);grid-auto-flow:column;gap:3px';
-  for(let i=0;i<84;i++){const d=new Date(start);d.setDate(start.getDate()+i);const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    const c=el('div','cell');const v=byDay[key]||0;if(d>today)c.style.opacity=.25;
-    if(v){c.style.background='var(--primary)';c.style.opacity=Math.min(1,.35+v/120);}c.title=key+(v?` · ${v} 分钟`:'');cg.appendChild(c);}
-  hm.appendChild(cg);grid.appendChild(hm);b.appendChild(grid);
-  // recent sessions
-  const rs=g.sessions.slice(-3).reverse();if(rs.length){const r=el('div','mt-3 text-xs text-[var(--muted-foreground)]');r.appendChild(el('span','font-medium text-[var(--foreground)]','最近：'));r.appendChild(document.createTextNode(rs.map(s=>s.date.slice(5)+' '+s.topic).join(' ｜ ')));b.appendChild(r);}
-}
-render();
-</script></body></html>"""
+def validate_html_path(output: Path, hub_path: Path) -> Path:
+    output = output.expanduser().resolve()
+    hub = hub_path.expanduser().resolve()
+    if output == hub or hub in output.parents:
+        raise ProgressError("HTML 输出必须位于学习数据目录之外，避免覆盖 hub 中的原始数据。")
+    if output.suffix.lower() != ".html":
+        raise ProgressError("HTML 输出文件须使用 .html 扩展名。")
+    return output
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--hub", default=str(DEFAULT_HUB))
-    ap.add_argument("--goal")
-    ap.add_argument("--today")
-    ap.add_argument("--html")
-    ap.add_argument("--json", action="store_true")
-    a = ap.parse_args()
+def write_html(output: Path, summary: str) -> None:
+    document = ("<!doctype html>\n<html lang=\"zh-CN\"><meta charset=\"utf-8\">"
+                "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                "<title>学习进度</title><style>body{font-family:system-ui,sans-serif;"
+                "max-width:68rem;margin:2rem auto;padding:0 1rem;line-height:1.7}"
+                "pre{font-family:inherit;white-space:pre-wrap;overflow-wrap:anywhere}"
+                "</style><body><pre>" + html.escape(summary) + "</pre></body></html>\n")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=output.parent,
+                                         prefix=f".{output.name}.", suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(document)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, output)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--hub", help="数据目录；默认 LEARNING_COACH_HUB 或 ~/learning-hub")
+    parser.add_argument("--goal")
+    parser.add_argument("--track", help="仅展示所选 Goal 下的一个 Track")
+    parser.add_argument("--today", help="展示日期 YYYY-MM-DD；不参与规划或状态计算")
+    parser.add_argument("--html", help="数据目录之外的 .html 摘要文件")
+    parser.add_argument("--json", action="store_true")
+    arguments = parser.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-
-    today = dt.date.fromisoformat(a.today) if a.today else dt.date.today()
-    groot = Path(a.hub) / "goals"
-    dirs = sorted(p for p in groot.glob("*") if p.is_dir()) if groot.exists() else []
-    if a.goal:
-        dirs = [d for d in dirs if d.name == a.goal]
-    goals = [analyze_goal(d, today) for d in dirs]
-    goals.sort(key=lambda g: g["status"] != "active")
-
-    if a.json:
-        print(json.dumps({"today": today.isoformat(), "goals": goals}, ensure_ascii=False, indent=2))
-    else:
-        print(summary_text(goals, today) if goals else f"未找到学习目标：{groot}")
-
-    if a.html:
-        iy, iw, _ = today.isocalendar()
-        data = {"today": today.isoformat(), "isoweek": f"{iy}-W{iw:02d}", "goals": goals}
-        payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-        out = Path(a.html)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(HTML_TMPL.replace("__DATA__", payload), encoding="utf-8")
-        print(f"\nHTML 面板已生成：{out}")
-    return 0
+    try:
+        today = dt.date.fromisoformat(arguments.today) if arguments.today else dt.date.today()
+        hub_path = Path(arguments.hub or os.environ.get("LEARNING_COACH_HUB") or DEFAULT_HUB).expanduser()
+        output = validate_html_path(Path(arguments.html), hub_path) if arguments.html else None
+        goals = load_goals(hub_path, arguments.goal, arguments.track)
+        summary = summary_text(goals, today)
+        if output:
+            write_html(output, summary)
+        if arguments.json:
+            print(json.dumps({"today": today.isoformat(), "goals": goals}, ensure_ascii=False, indent=2,
+                             allow_nan=False))
+        else:
+            print(summary)
+        if output:
+            print(f"HTML 摘要已生成：{output}", file=sys.stderr)
+        return 0
+    except (OSError, ValueError, ImportError, KeyError, TypeError) as error:
+        print(f"进度读取失败：{error}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

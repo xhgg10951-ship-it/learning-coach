@@ -1,51 +1,38 @@
 ---
 name: learning-coach
 description: >-
-  个人辅助学习系统（学习教练）。当用户想要：新建学习目标/构建学习画像、生成学习大纲或资料清单、
-  拆分月目标/周目标、"开始学习"/"今天学点什么"、"结束学习"/"生成笔记"、"查看学习进度"、
-  "调整学习计划"、"核验学习资料" 时使用。数据以 Markdown 存放在 C:\Users\Administrator\learning-hub\。
-  Use this skill whenever the user talks about their personal study plan, study sessions, or learning progress.
+  个人学习目标与渐进规划助手。用于新建学习目标、建立画像与学习领域、选择当前学习位置、
+  规划或调整当前阶段与学习单元、完成或跳过单元、查看进度和核验学习资料。
+  使用 Goal → Track → Milestone → Sprint → Session 五级结构，按成果和用户选择推进。
+  第一阶段仅提供 Session 结构接口，不实现教学闭环、自动笔记或跨对话学习记录。
 ---
 
 # Learning Coach（辅助学习系统）
 
-本系统只负责 **给方向、给目标、如实记录**。学习节奏和内容都以用户为准：不催促，不强制每天学习，也不要求留存学习证据。
+给方向、给当前目标、如实记录决策；学习内容和节奏以用户为准。普通一次性答疑不自动创建学习目标。
 
-## 数据目录
+## 入口与读取范围
 
-```
-C:\Users\Administrator\learning-hub\
-├─ profile.md                         # 用户基础画像
-└─ goals\<goal-slug>\
-   ├─ goal.md                         # 目标补充画像 + 水平测试结果
-   ├─ syllabus.md                     # 大纲 + 资料清单（含模块状态）
-   ├─ plan.md                         # 月目标 + 周目标（含状态）
-   └─ sessions\YYYY-MM-DD-<topic>.md  # 每次学习笔记
-```
+在本 Skill 根目录执行 `python scripts/learning.py --hub <数据目录> <子命令>`。`--hub` 必须放在子命令之前。数据目录按 `--hub` → `LEARNING_COACH_HUB` → `~/learning-hub` 解析，不依赖安装位置或特定用户名。
 
-- 模板在 [resources/templates/](./resources/templates/)，**必须严格遵循模板中的标记格式**（复选框、模块编号、周编号），否则进度脚本无法解析。
-- `goal-slug` 用简短的英文/拼音加连字符，如 `python-basics`、`kaoyan-math`。
-- 目录不存在时，首次使用直接创建。
+- 先用 `current` 读取当前位置；没有位置时用 `list` 查看目标，以用户明确选择为准。一次选定 Goal/Track 后，只读取公共画像、当前 Goal 说明和当前 Track 必要信息。
+- `select --goal G --track T` 只改变当前位置，允许在 Sprint 未完成时切换；不会暂停、完成、丢弃或重建原计划。
+- 架构与唯一状态来源见 [docs/architecture.md](docs/architecture.md)。不要通过 Markdown 复选框、日期或预计学时改变状态。
 
-## 意图路由
+| 用户意图 | 按需读取 | 程序入口 |
+|---|---|---|
+| 新建目标、建立或更新画像 | [onboarding.md](references/onboarding.md) | `init`、`goal-create`、`update` |
+| 建立领域、能力地图、调整依赖、换资料或核验资料 | [syllabus.md](references/syllabus.md) | `track-create`、`update` |
+| 选择领域、当前计划、规划下一步、完成/跳过/调整 Sprint 或 Milestone | [planning.md](references/planning.md) | `select`、`show`、`milestone-create`、`sprint-create`、`transition` |
+| 查看进度、学习看板、读取旧数据 | [progress.md](references/progress.md) | `current`、`show`、`validate`、`scripts/progress.py` |
+| 开始或结束一次学习、指定本次主题、询问学习笔记 | [session.md](references/session.md) | `session-spec`（仅返回结构描述） |
 
-先判断用户意图，**只读取对应的参考文档**：
+## 必须保持的约束
 
-| 用户说法（示例） | 读取 |
-|---|---|
-| 新建学习目标、我想学 X、建立画像 | [references/onboarding.md](./references/onboarding.md) → 然后执行 syllabus 与 planning |
-| 生成/重做大纲、换资料、核验资料、资料太难 | [references/syllabus.md](./references/syllabus.md) |
-| 拆月/周目标、调整计划、进入新月份、落后了 | [references/planning.md](./references/planning.md) |
-| 开始学习、今天学什么、结束、生成笔记 | [references/session.md](./references/session.md) |
-| 查看进度、学习看板 | [references/progress.md](./references/progress.md) |
-
-有多个目标且用户未指明时，列出 `goals\` 下的目标让用户选择；只有一个目标时直接使用。
-
-## 全局硬性规则
-
-1. **资料真实性**（最高优先级）：任何学习资料都必须按 [references/syllabus.md](./references/syllabus.md) 的「资料规则」给出，并经过联网核实。禁止凭记忆编造书名、章节号、页码、URL、版本号。无法核实的，必须标注 `⚠ 未验证`。
-2. **如实记录**：笔记只记录本次会话中实际发生的内容，不夸大掌握程度，也不补写没做过的练习。
-3. **写入前确认**：画像、大纲、计划的首次生成和重大修改，以及每次学习笔记，都要先给用户预览，确认后再写入文件。
-4. **时间基准**：以系统提供的当前本地时间为准，周按 ISO 周计算（如 `2026-W41`，周一为一周的第一天）。
-5. **语言**：用中文交互。资料偏好以 `profile.md` / `goal.md` 中的设置为准（默认：尽量只给中文资料；中文资料不权威或版本落后时，改用英文原版并附中文导读，同时注明原因）。
-6. **不催促**：落后时只客观提示一次，并给出可选的调整方案，不说教。
+1. **逐步规划**：Goal 只建立粗粒度 Track 地图。用户选择 Track 后，只创建当前一个 Milestone，再创建其第一个 Sprint；不预生成未来全部单元。下一单元必须依据已完成内容、剩余验收要求和用户反馈，保留历史及用户修改。
+2. **能力驱动**：Milestone 约 20～40 小时、Sprint 约 3～8 小时、Session 约 60 分钟，仅是粒度参考。日期只作元数据。没有按日历触发的延期、顺延、失败或自动完成。
+3. **可检验目标**：Milestone/Sprint 必须有能力目标和验收标准。完成时用 `transition ... --status completed --note "实际验收结果"`；用户自报可以作为说明，不强制提交附件。数量或学时不能作为掌握证明。跳过、提前结束分别记录 `skipped`、`ended`。
+4. **重要规划确认**：首次建立画像、Track 结构及当前 Milestone/Sprint，或重大调整前，让用户看到具体方案。用户已明确授权具体方案时直接执行，不重复确认。用户明确要求切换、暂停或跳过时，按该指令执行并记录理由。
+5. **Python 管状态**：所有关键状态、目标、验收标准和历史通过 CLI 更新。执行成功后读取结果再报告；错误时保留原文件，说明错误，不让 Agent 猜测 JSON 或改复选框“修复”。Markdown 是画像、资料和说明补充，不能成为第二份状态表。
+6. **资料真实性**：按 [syllabus.md](references/syllabus.md) 核验资料。禁止凭记忆编造资料、版本、页码或网址；无法核验的字段明确标注。优先中文，必要时提供英文原版与中文导读。
+7. **阶段边界**：`sessions/` 仅预留。本阶段不写 Session 笔记、不自动出题批改、不自动更新画像、不构建共享知识或复习系统。旧笔记和模板保留可读，兼容与延后能力见 [session.md](references/session.md)。
