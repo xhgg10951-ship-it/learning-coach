@@ -1,5 +1,7 @@
 # 第一阶段重构交付记录
 
+> 历史交付快照：以下“Session 不持久化/后续阶段”等说明仅描述 Phase 1 当时的范围。当前 Session 生命周期、笔记和跨对话恢复已由 [Phase 2A](session-schema.md) 扩展；以当前 [架构](architecture.md) 和 [Session 指令](../references/session.md) 为准。
+
 交付日期：2026-10-08。分支：`refactor/phase1-learning-structure`。
 
 基于仓库原有 12 个文件完成实际重构，保留标准库 Python 与本地文件机制。本次没有读取、迁移或改写仓库外的真实学习数据；所有功能验证都使用独立临时目录。本次仅进行本地 Git 提交，远端推送由用户自行完成；提交记录以 Git 历史为准。

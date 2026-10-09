@@ -2,7 +2,7 @@
 
 ## 当前层次与范围
 
-Goal 是最终能力目标，Track 是独立学习领域，Milestone 是较大的能力阶段，Sprint 是当前中等颗粒度单元，Session 是一次自主学习的结构描述。Milestone 约 20～40 小时、Sprint 约 3～8 小时仅作为拆分参考；不对应日历月份或周数。
+Goal 是最终能力目标，Track 是独立学习领域，Milestone 是较大的能力阶段，Sprint 是当前中等颗粒度单元，Session 是一次自主学习及其真实记录。Milestone 约 20～40 小时、Sprint 约 3～8 小时仅作为拆分参考；不对应日历月份或周数。Session 保存和续学见 [session.md](session.md)，结束 Session 不自动推进任何规划状态。
 
 先用 `current` 定位当前 Goal/Track。规划后续单元或调整已有单元前，必须用 `show --goal G --track T` 读取该 Track 的目标、验收标准、全部单元结果与决策历史；`current` 的当前位置摘要不能代替这一步。Agent 结合当前 Track 范围、已完成内容、跳过/结束记录、用户主动修改与尚缺能力规划下一步。不要把被跳过的内容当作已掌握，不要每次重新生成整份计划。
 

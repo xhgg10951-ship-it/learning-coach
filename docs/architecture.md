@@ -1,4 +1,4 @@
-# Learning Coach 第一阶段架构
+# Learning Coach 架构（Phase 1 + Phase 2A）
 
 ## 范围与旧设计处置
 
@@ -10,7 +10,7 @@
 | 权威资料查找、范围与版本核验 | 保留；按当前 Track 逐步读取与细化 |
 | 月目标、ISO 周、复选框状态、自动顺延 | 新版使用非日历的 Milestone/Sprint，状态改由 Python 校验的 JSON 保存 |
 | 全局大纲与单文件计划 | 拆为多个独立 Goal/Track，初始化仅保留粗粒度地图 |
-| 学习热身、练习批改、结束后笔记与画像更新 | 明确延后；Session 只预留目录与只读结构接口 |
+| 学习热身、练习批改、结束后笔记与画像更新 | Phase 2A 保存实际练习与批改、生成笔记及交接；不实现教学调度或自动画像 |
 | 旧进度脚本与 HTML | 保留只读兼容入口；新版和旧版明确区分，移除日历推进及掌握率推断 |
 | 旧模板与已有数据 | 旧模板原样保存到 `resources/templates/legacy/`；不修改已有用户数据 |
 
@@ -22,7 +22,7 @@
 | Track | 一个相对独立的学习领域，如 Spring Boot | 独立目录、状态、依赖建议与计划 |
 | Milestone | 可检验的大阶段能力目标 | 当前阶段与历史，默认参考 20～40 小时 |
 | Sprint | 阶段下可检验的学习单元 | 当前单元与历史，默认参考 3～8 小时 |
-| Session | 用户选定的一次学习 | 可选 Sprint 关联、主题、建议约 60 分钟；不持久化 |
+| Session | 用户选定的一次学习 | 可选 Sprint 关联、计划外主题、追加检查点、结束笔记及跨对话交接 |
 
 创建 Goal → 建立粗粒度 Track 地图 → 用户选择 Track → 创建一个 Milestone → 创建它的第一个 Sprint。后续单元依据现有目标、已完成内容、尚缺能力和用户反馈逐个创建。原计划、完成记录、跳过理由及用户主动修改均保留，不以动态规划为由整体覆盖重建。
 
@@ -47,6 +47,10 @@ learning-hub/
 │   │       │   ├── sprints/
 │   │       │   │   └── SP001.md
 │   │       │   └── sessions/
+│   │       │       ├── index.json
+│   │       │       └── SE-<UUID>/
+│   │       │           ├── record.json
+│   │       │           └── note.md
 │   │       └── mysql/
 │   └── english/
 │       ├── goal.md
@@ -65,7 +69,8 @@ learning-hub/
 | `track.md` | 范围、资料及粗略未来方向的说明补充 |
 | `milestones/<M>.md`、`sprints/<SP>.md` | 可人工编辑的补充说明，不重复维护状态或验收结论 |
 | `state/active.json` | 当前 `goal_id`、`track_id` 选择指针及 schema/更新时间；不复制单元状态或掌握信息 |
-| `sessions/` | 仅预留目录，第一阶段不写学习记录 |
+| `sessions/<SE-ID>/record.json` | 单次学习状态、追加事实、检查点及交接的唯一机器来源 |
+| `sessions/index.json`、`sessions/<SE-ID>/note.md` | 从记录派生的定位缓存和学习笔记，不是第二套可编辑状态 |
 
 机器文档使用 `schema_version = 2`。当前选择文件只保存位置指针及必要的 schema/时间元数据。关键字段由程序校验，不从 Markdown、复选框或文件名猜测状态。Markdown 标题和说明只供阅读，JSON 中对应受管理字段发生更新后，说明文件不应作为旧值的权威来源。
 
@@ -77,15 +82,18 @@ learning-hub/
 - Milestone/Sprint ID 在所属 Track 内唯一，默认分别按 `M001`/`SP001` 递增，编号不依赖日期，Sprint 编号不随 Milestone 重置。
 - 所有定位使用 Goal/Track 限定上下文；完整标识可理解为 `(goal_id, track_id, kind, id)`，不同 Goal/Track 中同样的短 ID 不会串写。
 - Track 前置依赖仅引用同一 Goal 的其他 Track。程序拒绝缺失、自依赖和循环引用；依赖是学习建议，不要求前置 Track 完成才可选择或激活当前 Track。
-- Session 暂不创建稳定记录 ID、学习状态或共享知识对象。后续可通过完整上下文关联记录，本阶段不建立无用途的知识表、事件总线或共享进度机制。
+- Session 使用稳定的 `SE-<UUID>`，记录所属 Goal/Track、可选 Sprint 及验收快照。同 Track 最多一份 active Session；其他 Track 独立保留。实际学习内容不受 Sprint 范围限制，不建立共享知识或跨目标进度同步。
 
 ## 状态与层级约束
+
+下面的暂停、跳过和父子推进规则适用于规划层级。Session 独立采用 active → completed，不要求能力验收、不自动完成 Sprint；保存原有事实和结束记录不受上层后来暂停的影响。开始与恢复学习仍要求 Goal/Track active。
 
 | 层级 | 支持的状态 | 终态 |
 |---|---|---|
 | Goal | `active`、`paused`、`completed` | `completed` |
 | Track | `pending`、`active`、`paused`、`completed` | `completed` |
 | Milestone / Sprint | `pending`、`active`、`paused`、`completed`、`skipped`、`ended` | `completed`、`skipped`、`ended` |
+| Session | `active`、`completed` | `completed`；仅表示本次学习收束 |
 
 `pending` 是待开始，`active` 是进行中，`paused` 是明确暂停，`completed` 是记录了能力验收结果的完成，`skipped` 是用户选择不做，`ended` 是用户提前结束且未声称完成。创建默认 active，支持 pending 的创建入口可按用户要求保存待开始单元；状态转换不提供回到 pending。
 
@@ -99,6 +107,10 @@ learning-hub/
 `transition` 状态变化和 `update` 重要字段更新必须带 `--note` 并保留历史；创建保存初始决策，调整创建使用 `--adjustment` 记录用户理由。`update` 可修改标题、目标、验收标准、依赖和画像，不能改变 ID 或通过变更内容重开终态记录。
 
 ## Agent 与 Python 分工
+
+Phase 2A 中，Agent 从实际会话整理带来源摘录的内容、问题、解释、练习、薄弱点、理解反馈和验收证据，Python 批量校验并持久化。交接区分用户自报、AI 判断、练习验证和未验证，不能把已讲解当成已掌握。收到明确结束保存指令立即停止教学并保存，无须再次机械确认。
+
+Session 记录采用单文件原子提交，笔记与索引是可重建投影。新对话读取 session-context，只展开相关少量记录；active 可以恢复，completed 只能作为新 Session 的参考。索引失效时内存重建；缺失笔记可修复，冲突文件保留。具体协议见 [session-schema.md](session-schema.md)。
 
 Agent 理解目标、复用画像、提出领域结构，生成当前能力目标和验收标准，核验资料，根据已有结果建议下一步并让用户确认重要规划。已授权的具体方案无需再次确认。自由切换、暂停、跳过等用户明确指令直接落实。
 
@@ -116,7 +128,10 @@ CLI 位于 `scripts/learning.py`；全局 `--hub` 位于子命令之前：
 | `transition` | 校验状态转换，要求决策或验收说明 |
 | `update` | 更新受管理的内容字段并保存理由 |
 | `validate` | 全库结构和状态检查，不修复或覆盖文件 |
-| `session-spec` | 返回无持久化、无生命周期的 Session 兼容描述 |
+| `session-spec` | 保留第一阶段只读兼容描述；真正开始学习使用 session-start |
+| `session-start`、`session-checkpoint`、`session-finish` | 稳定 ID、批量事实、重要检查点和结束笔记 |
+| `session-context`、`session-resume` | 精简交接、恢复 active；completed 只作为新 Session 的参考 |
+| `session-list`、`session-show`、`session-repair` | 最近 N 次摘要、事实分页、派生文件恢复 |
 
 真实可运行示例见 [onboarding](../references/onboarding.md)、[planning](../references/planning.md) 和 [progress](../references/progress.md)。各命令的完整参数以 `python scripts/learning.py <子命令> --help` 为准。
 
@@ -145,9 +160,11 @@ CLI 位于 `scripts/learning.py`；全局 `--hub` 位于子命令之前：
 
 ## 本阶段边界与已知风险
 
-已实现的是多目标、多领域、当前渐进规划、自由切换、显式状态更新、历史、可靠读取及兼容报告。计划选择与状态真实落盘，Session 描述明确不持久化。
+已实现多目标、多领域、渐进规划、自由切换、显式状态更新、历史与兼容报告，以及 Phase 2A Session 生命周期、真实事实持久化、Markdown 笔记和跨对话续学。模型、字段、限量读取、提交与恢复协议见 [session-schema.md](session-schema.md)，实施前约定见 [phase2a-design.md](phase2a-design.md)。
 
-第二阶段再实现 Session 生命周期和持久化记录、学习笔记及相关教学闭环。跨对话 Session Handoff、共享知识库、跨 Goal 掌握同步、智能复习、FSRS、向量数据库/RAG、Web 前端和多 Agent 协作都不在本阶段。仅保留目录与必要关联字段，不提前承诺这些能力。
+修改清单、实际测试结果与限制见 [Phase 2A 交付记录](phase2a-delivery.md)。
+
+本阶段不实现自适应教学、练习调度、自动画像、共享知识库、跨 Goal 掌握同步、复习调度、FSRS、向量数据库/RAG、Web 前端或多 Agent 系统。knowledge_ids/review_candidates 只预留字段。Agent 记录真实事实，Python 校验结构、引用和写入，程序不生成不存在的学习事实。
 
 JSON 能校验结构与状态，不能判定学习者是否真正掌握；验收说明的质量由用户与 Agent 负责。多文件创建不是完整事务，异常恢复需备份和人工核对。旧数据需要人工解释，不能自动得到可信的新能力结论。没有强制资料联网依赖，无法核验时必须如实标注；联网资料的版本变化不自动改写已完成历史。
 

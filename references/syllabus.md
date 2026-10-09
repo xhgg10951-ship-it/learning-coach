@@ -13,7 +13,7 @@ python scripts/learning.py --hub ./learning-hub-demo track-create --goal java-ba
 python scripts/learning.py --hub ./learning-hub-demo select --goal java-backend --track spring-boot
 ```
 
-`--id` 可省略，由程序生成。每个 Track 有自己的 `state.json`、Milestone、Sprint 和预留 Session 目录。可在 `track.md` 记录粗略能力范围、资料、用户偏好和未来方向，参考 [track 模板](../resources/templates/track.md)。原名 [syllabus 模板](../resources/templates/syllabus.md) 用于组织粗粒度能力地图，不再是复选框状态表。
+`--id` 可省略，由程序生成。每个 Track 有自己的 `state.json`、Milestone、Sprint 和 Session 目录。学习记录与交接按 [session.md](session.md) 独立保存。可在 `track.md` 记录粗略能力范围、资料、用户偏好和未来方向，参考 [track 模板](../resources/templates/track.md)。原名 [syllabus 模板](../resources/templates/syllabus.md) 用于组织粗粒度能力地图，不再是复选框状态表。
 
 前置依赖只表达建议，可设多项：重复 `--depends-on`。更新时传入的是完整依赖列表；使用 `update ... --clear-dependencies --note "用户决定取消前置建议"` 可以清空依赖。程序检查同一 Goal 内引用是否存在，以及自依赖和循环；它不会根据前置领域是否完成阻止用户选择或学习当前 Track。调整标题或依赖通过 CLI 记录历史，不改目录 ID：
 

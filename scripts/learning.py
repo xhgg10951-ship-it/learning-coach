@@ -634,6 +634,13 @@ class Hub:
                 "topic": _text(topic, "topic"), "planned_minutes": minutes,
                 "extensions": {}, "persisted": False}
 
+    def sessions(self):
+        if __package__:
+            from .sessions import SessionStore
+        else:
+            from sessions import SessionStore
+        return SessionStore(self)
+
     def validate(self):
         if self._path(".write.lock").exists():
             raise LearningError("存在写锁；请等待写入完成，或确认无写入程序后人工处理残留锁")
@@ -643,13 +650,17 @@ class Hub:
             raise LearningError(f"发现中断暂存文件 {pending}；保留并人工检查，不自动删除")
         goals = self.list_goals()
         count = 0
+        session_count = 0
         for goal in goals:
             tracks = self.list_tracks(goal["id"])
             if goal["status"] == "completed" and any(t["status"] != "completed" for t in tracks):
                 raise LearningError(f"Goal {goal['id']}: completed 下存在未完成 Track")
             count += len(tracks)
+            for track in tracks:
+                session_count += self.sessions().validate_track(goal["id"], track["id"])
         self.current()
-        return {"valid": True, "schema_version": SCHEMA_VERSION, "goals": len(goals), "tracks": count}
+        return {"valid": True, "schema_version": SCHEMA_VERSION, "goals": len(goals), "tracks": count,
+                "sessions": session_count}
 
 
 class JsonArgumentParser(argparse.ArgumentParser):
@@ -717,12 +728,23 @@ def parser():
     session.add_argument("--sprint")
     session.add_argument("--topic", required=True)
     session.add_argument("--minutes", type=int, default=60)
+    if __package__:
+        from .sessions import add_commands
+    else:
+        from sessions import add_commands
+    add_commands(commands)
     return ap
 
 
 def run(args):
     hub = Hub(args.hub)
     command = args.command
+    if command.startswith("session-") and command != "session-spec":
+        if __package__:
+            from .sessions import run as run_session
+        else:
+            from sessions import run as run_session
+        return run_session(hub.sessions(), args)
     if command == "init":
         return hub.initialize()
     if command in {"current", "validate"}:
@@ -767,17 +789,22 @@ def run(args):
 
 
 def main(argv=None):
-    for stream in (sys.stdout, sys.stderr):
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
     try:
         result = run(parser().parse_args(argv))
         print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
         return 0
-    except (LearningError, OSError) as exc:
+    except (LearningError, OSError, UnicodeError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # Use the same module identity as sessions.py, including LearningError.
+    if __package__:
+        from .learning import main as entry_main
+    else:
+        from learning import main as entry_main
+    raise SystemExit(entry_main())

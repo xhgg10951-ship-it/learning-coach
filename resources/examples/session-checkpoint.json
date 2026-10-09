@@ -1,0 +1,14 @@
+{
+  "operation_id": "arraylist-checkpoint-1",
+  "events": [
+    {"id": "content-1", "kind": "content", "text": "讨论了 ArrayList 的 size、容量和扩容时的元素复制。", "basis": "unverified", "sources": [{"ref": "模拟会话/assistant/1", "quote": "这次先区分元素个数和底层数组容量。"}]},
+    {"id": "question-1", "kind": "question", "text": "为什么预分配容量后 size 还是 0？", "basis": "user_report", "sources": [{"ref": "模拟会话/user/2", "quote": "new ArrayList<>(10) 之后 size 为什么不是 10？"}]},
+    {"id": "explanation-1", "kind": "explanation", "text": "容量表示存储空间，size 表示已经加入的元素个数；预分配空间不等于添加元素。", "basis": "ai_assessment", "related_ids": ["question-1"], "sources": [{"ref": "模拟会话/assistant/3", "quote": "构造容量为 10 的列表还没有元素，所以 size 为 0。"}]},
+    {"id": "exercise-1", "kind": "exercise", "text": "首次区分 size 与容量的练习答错。", "basis": "exercise_verified", "prompt": "容量为 10 的空列表添加两个元素后 size 是多少？", "answer": "10", "result": "incorrect", "feedback": "应为 2；用户把容量当成元素个数。", "sources": [{"ref": "模拟会话/user/4", "quote": "我觉得还是 10。"}, {"ref": "模拟会话/assistant/5", "quote": "这道题答案是 2，容量和元素个数不同。"}]},
+    {"id": "weakness-1", "kind": "weakness", "text": "size 与容量仍容易混淆。", "basis": "exercise_verified", "related_ids": ["exercise-1"], "sources": [{"ref": "模拟会话/user/4", "quote": "我觉得还是 10。"}]},
+    {"id": "weakness-2", "kind": "weakness", "text": "扩容复制成本尚不清楚。", "basis": "user_report", "sources": [{"ref": "模拟会话/user/6", "quote": "扩容为什么要复制，我还没理解。"}]},
+    {"id": "unresolved-1", "kind": "unresolved", "text": "扩容为什么需要复制，以及如何理解这部分成本？", "basis": "unverified", "sources": [{"ref": "模拟会话/user/6", "quote": "扩容为什么要复制，我还没理解。"}]},
+    {"id": "understanding-1", "kind": "understanding", "text": "用户明确表示仍不理解扩容复制。", "basis": "user_report", "understanding": "not_understood", "sources": [{"ref": "模拟会话/user/6", "quote": "扩容为什么要复制，我还没理解。"}]}
+  ],
+  "handoff": {"summary": "模拟学习：已讨论 ArrayList 的 size 和容量；一次练习答错，暴露两个薄弱点，扩容复制问题仍未解决。", "next_step": "建议先用两个数组说明扩容复制，再由用户选择是否继续练习 size 与容量。", "focus_ids": ["content-1", "question-1", "weakness-1", "weakness-2", "unresolved-1", "understanding-1"]}
+}

@@ -1,0 +1,8 @@
+{
+  "operation_id": "arraylist-finish-1",
+  "events": [
+    {"id": "exercise-2", "kind": "exercise", "text": "能在另一个具体例子中判断 size。", "basis": "exercise_verified", "prompt": "容量为 20，当前有 3 个元素，再添加一个，size 是多少？", "answer": "4，因为只多了一个元素，不是看容量。", "result": "correct", "feedback": "本例判断和理由正确；不据此推断所有场景都已稳定掌握。", "sources": [{"ref": "模拟会话/user/7", "quote": "4，因为只多了一个元素，不是看容量。"}, {"ref": "模拟会话/assistant/8", "quote": "本例回答正确。"}]},
+    {"id": "evidence-1", "kind": "evidence", "text": "在给定添加元素的例子中，用户正确判断了 size。", "basis": "exercise_verified", "criterion": "在具体例子中判断 size", "outcome": "met", "related_ids": ["exercise-2"], "sources": [{"ref": "模拟会话/user/7", "quote": "4，因为只多了一个元素，不是看容量。"}]}
+  ],
+  "handoff": {"summary": "模拟学习：讨论了 ArrayList 的 size、容量和扩容；先答错一道题，后在一个新例子中判断 size 正确。两个薄弱点仍需关注，扩容复制尚未解释清楚。", "next_step": "建议从扩容复制的图示继续；用户可以拒绝并改学其他内容。", "focus_ids": ["content-1", "evidence-1", "weakness-1", "weakness-2", "unresolved-1", "understanding-1"]}
+}

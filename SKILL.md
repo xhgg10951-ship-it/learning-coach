@@ -2,9 +2,10 @@
 name: learning-coach
 description: >-
   个人学习目标与渐进规划助手。用于新建学习目标、建立画像与学习领域、选择当前学习位置、
-  规划或调整当前阶段与学习单元、完成或跳过单元、查看进度和核验学习资料。
+  规划或调整当前阶段与学习单元、完成或跳过单元、查看进度和核验学习资料，
+  以及开始学习、保存检查点、结束并记笔记、跨对话继续上次学习。
   使用 Goal → Track → Milestone → Sprint → Session 五级结构，按成果和用户选择推进。
-  第一阶段仅提供 Session 结构接口，不实现教学闭环、自动笔记或跨对话学习记录。
+  Python 校验并持久化真实学习事实；普通一次性答疑不自动保存。
 ---
 
 # Learning Coach（辅助学习系统）
@@ -25,7 +26,7 @@ description: >-
 | 建立领域、能力地图、调整依赖、换资料或核验资料 | [syllabus.md](references/syllabus.md) | `track-create`、`update` |
 | 选择领域、当前计划、规划下一步、完成/跳过/调整 Sprint 或 Milestone | [planning.md](references/planning.md) | `select`、`show`、`milestone-create`、`sprint-create`、`transition` |
 | 查看进度、学习看板、读取旧数据 | [progress.md](references/progress.md) | `current`、`show`、`validate`、`scripts/progress.py` |
-| 开始或结束一次学习、指定本次主题、询问学习笔记 | [session.md](references/session.md) | `session-spec`（仅返回结构描述） |
+| 开始学习、记录进展、结束并记笔记、继续上次学习 | [session.md](references/session.md) | `session-context`、`session-start`、`session-checkpoint`、`session-finish`、`session-resume` |
 
 ## 必须保持的约束
 
@@ -35,4 +36,6 @@ description: >-
 4. **重要规划确认**：首次建立画像、Track 结构及当前 Milestone/Sprint，或重大调整前，让用户看到具体方案。用户已明确授权具体方案时直接执行，不重复确认。用户明确要求切换、暂停或跳过时，按该指令执行并记录理由。
 5. **Python 管状态**：所有关键状态、目标、验收标准和历史通过 CLI 更新。执行成功后读取结果再报告；错误时保留原文件，说明错误，不让 Agent 猜测 JSON 或改复选框“修复”。Markdown 是画像、资料和说明补充，不能成为第二份状态表。
 6. **资料真实性**：按 [syllabus.md](references/syllabus.md) 核验资料。禁止凭记忆编造资料、版本、页码或网址；无法核验的字段明确标注。优先中文，必要时提供英文原版与中文导读。
-7. **阶段边界**：`sessions/` 仅预留。本阶段不写 Session 笔记、不自动出题批改、不自动更新画像、不构建共享知识或复习系统。旧笔记和模板保留可读，兼容与延后能力见 [session.md](references/session.md)。
+7. **真实记录**：用户明确开始跟踪学习或要求保存时调用持久化接口；普通答疑或拒绝记录时不写入。Agent 从实际会话整理事实、摘录和引用，区分用户自报、AI 判断、练习验证、未验证；讲解不等于掌握。批量 checkpoint 保存重要进展，不要求每题执行多次写操作。
+8. **结束与续学**：收到“结束并记笔记”“今天就到这里，记录一下”“总结本次学习并保存”时立即停止教学，汇总真实内容、验收证据与下次交接，调用 `session-finish`，不重复确认、不强制练习或改错。新对话先 `session-context`；active 用 `session-resume`，completed 只作为新 `session-start --from-session` 的参考。允许换主题，Session 完成不自动完成 Sprint。
+9. **阶段边界**：不自动更新画像，不开发教学策略、练习调度、知识共享、FSRS、复习调度或多 Agent 系统。`session-spec` 保留只读兼容；旧笔记只读。详细输入、恢复和兼容规则见 [session.md](references/session.md)。

@@ -13,6 +13,8 @@ python scripts/learning.py --hub ./learning-hub-demo show --goal java-backend --
 
 `current` 按 `state/active.json` 找到用户选择；`select` 才修改这个指针。当前目标未指定 Track 时，先展示必要的领域摘要，不猜测用户意图。正常处理仅读取当前 Goal 和 Track；明确请求全局概览或排错时再全库读取。
 
+跨对话续学使用 [session.md](session.md) 的 `session-context`，按需 `session-list` / `session-show`。`progress.py` 继续报告规划状态；不把 Session 完成数、记录条数或练习数量换算成 Sprint 完成或掌握率。
+
 说明当前 Milestone/Sprint 的目标、验收标准、状态与剩余能力即可。列出已完成、跳过和提前结束的记录时保留区别，不以完成条数或预计学时计算“掌握率”，不提出日期触发的重排。
 
 ## 文本、JSON 与 HTML
