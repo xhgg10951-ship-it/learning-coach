@@ -1,5 +1,7 @@
 # Phase 2A 实施约定
 
+> 下文是初次实施前的约定。后续显式结束后更正的版本扩展见 [第二轮审查修复](phase2a-review2-fixes.md)，当前合约见 [Session 协议](session-schema.md)。
+
 开发基线：`refactor/phase1-learning-structure`，提交 `10e6b0a`。实现分支：`feature/phase2a-session-persistence`。
 
 实施前确定以下接口和兼容边界：

@@ -1,0 +1,9 @@
+{
+  "operation_id": "arraylist-correction-1",
+  "reason": "模拟用户在结束后核对记录：第二道题实际回答 20，先前误记为 4，原批改和达标证据需要更正。",
+  "events": [
+    {"id": "exercise-2-corrected", "kind": "exercise", "text": "更正第二道题的答案记录及批改；该例尚未验证正确判断 size。", "basis": "exercise_verified", "prompt": "容量为 20，当前有 3 个元素，再添加一个，size 是多少？", "answer": "20", "result": "incorrect", "feedback": "应为 4，实际回答把容量当作 size；先前记为正确有误。", "supersedes": ["exercise-2"], "sources": [{"ref": "模拟更正/user/9", "quote": "我第二题回答的是 20，不是 4，之前记录错了。"}, {"ref": "模拟更正/assistant/10", "quote": "已核对，第二题实际回答 20，应判为错误，撤回依赖它的达标结论。"}]},
+    {"id": "weakness-corrected", "kind": "weakness", "text": "核对后的第二道题仍显示 size 与容量混淆。", "basis": "exercise_verified", "related_ids": ["exercise-2-corrected"], "sources": [{"ref": "模拟更正/user/9", "quote": "我第二题回答的是 20，不是 4，之前记录错了。"}]}
+  ],
+  "handoff": {"summary": "模拟结束后更正：第二道题的实际回答与批改已修正，原达标结论失效。size 与容量仍混淆，扩容复制问题仍未解决。", "next_step": "建议先核对 size 与容量的区别；用户可以改选主题。", "focus_ids": ["exercise-2-corrected", "weakness-corrected", "weakness-2", "unresolved-1"]}
+}

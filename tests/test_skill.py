@@ -44,6 +44,7 @@ class SkillWorkflowTests(unittest.TestCase):
             session_results = []
             session_id = None
             finish_results = []
+            correction_results = []
             for reference in ("onboarding", "syllabus", "planning", "session", "progress"):
                 document = ROOT / "references" / f"{reference}.md"
                 for block in SHELL_BLOCK.findall(document.read_text(encoding="utf-8")):
@@ -78,19 +79,28 @@ class SkillWorkflowTests(unittest.TestCase):
                                 session_id = payload["id"]
                             if command == "session-finish":
                                 finish_results.append(payload)
+                            if command == "session-correct":
+                                correction_results.append(payload)
             self.assertTrue({"init", "goal-create", "track-create", "select", "current", "show",
                              "milestone-create", "sprint-create", "transition", "update", "validate",
                              "session-spec"}.issubset(commands))
             self.assertTrue({"session-start", "session-checkpoint", "session-finish", "session-resume",
-                             "session-context", "session-list", "session-show", "session-repair"}.issubset(commands))
+                             "session-context", "session-list", "session-show", "session-correct", "session-repair"}.issubset(commands))
             self.assertEqual(finish_results[0], finish_results[1])
+            self.assertEqual(correction_results[0], correction_results[1])
             saved = json.loads(Path(finish_results[0]["record_path"]).read_text(encoding="utf-8"))
             self.assertEqual(saved["status"], "completed")
-            self.assertEqual(len(saved["events"]), 10)
-            self.assertEqual(len(saved["checkpoints"]), 2)
+            self.assertEqual(len(saved["events"]), 12)
+            self.assertEqual(len(saved["checkpoints"]), 3)
+            self.assertEqual(saved["session_version"], 2)
+            self.assertEqual(saved["completed_at"], finish_results[0]["completed_at"])
+            self.assertEqual(saved["checkpoints"][-1]["kind"], "correction")
             note = Path(finish_results[0]["note_path"]).read_text(encoding="utf-8")
             self.assertIn("扩容复制成本尚不清楚", note)
             self.assertIn("用户答案：10", note)
+            self.assertIn("依据已失效", note)
+            self.assertIn("结束后更正", note)
+            self.assertIn("用户答案：20", note)
             planning = work / "planning-demo"
             state = json.loads((planning / "goals/java-backend/tracks/spring-boot/state.json").read_text(encoding="utf-8"))
             self.assertEqual(set(state["sprints"]), {"SP001", "SP002"})

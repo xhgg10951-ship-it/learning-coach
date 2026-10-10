@@ -12,7 +12,7 @@ goals/<G>/tracks/<T>/sessions/
     note.md                     # completed 后的确定性投影
 ```
 
-规划文件保持 `schema_version=2`，Session 文件使用相同封装版本并增加 `session_version=1`。不迁移、不回填、不改写已有规划文件。空 sessions 目录保持第一阶段行为；旧版 Goal 级笔记仍由 progress 只读读取。
+规划文件保持 `schema_version=2`，Session 文件使用相同封装版本。新建和普通保存使用 session_version=1；首次显式 session-correct 将那一份记录升为 session_version=2，支持结束后的更正检查点。两版均可读取，版本 1 文件不会因读取、finish 重试或 repair 升级，旧程序遇到版本 2 会明确拒绝。不迁移、不回填、不改写已有规划文件。空 sessions 目录保持第一阶段行为；旧版 Goal 级笔记仍由 progress 只读读取。
 
 | record.json 字段 | 约定 |
 |---|---|
@@ -21,15 +21,17 @@ goals/<G>/tracks/<T>/sessions/
 | `sprint_id`、`sprint_snapshot` | 可为 null；关联时保存 ID、Milestone ID、objective、criteria 快照，规划修改不重解释旧证据 |
 | `topic` | 实际主题，最多 500 字符，可为计划外内容 |
 | `status` | active/completed；中断保持 active，不靠时间猜状态 |
-| `created_at`、`updated_at`、`completed_at` | Python 生成 UTC ISO 时间，包含时区；完成前 completed_at 为 null |
+| `created_at`、`updated_at`、`completed_at` | Python 生成 UTC ISO 时间，包含时区；完成前 completed_at 为 null；更正仅推进 updated_at，保留原 completed_at |
 | `start_request_id` | 调用方稳定请求键，同 Track 唯一，用于开始操作重试 |
 | `previous_session_id` | 同 Track 已结束记录 ID 或 null；只关联，不复制事实 |
 | `events` | 顺序追加的事实，不覆盖旧内容 |
-| `checkpoints` | operation_id、kind、at、event_ids、当时的 handoff、内容 SHA-256；顺序覆盖全部事实，finish 必须最后 |
+| `checkpoints` | operation_id、kind、at、event_ids、当时的 handoff、内容 SHA-256；连续按顺序覆盖全部事实。版本 1 的 finish 必须最后；版本 2 的唯一 finish 后只允许 correction，另必填 reason |
 | `handoff` | 最后检查点的交接；尚无检查点为 null |
 | `extensions` | knowledge_ids 和 review_candidates 空数组，仅预留 |
 
 同 Track 最多一份 active Session，不同 Track 独立保留。select 不修改 Session。completed 仅表示本次学习收束，不触发 Sprint/Milestone/Track/Goal 转换。
+
+版本 2 必须包含结束后更正；不能单独改版本号来绕过校验。原始 events/checkpoints 内容不变，追加的 correction 摘要包含 reason。更正不会改变其他 Session、学习完成时间、历史排序或父级规划状态。result 返回 session_version 与 correction_count。
 
 ## 事实与输入校验
 
@@ -72,9 +74,15 @@ checkpoint / finish 输入三个字段：
 
 events 每批 0～100 条，handoff 每次必填。focus_ids 最多 20 个，引用现存有效事实。无练习、只有一个问题、未完成 Sprint 或没有学习事实都可结束，不得为填满笔记编造内容。
 
+session-correct 使用同一批量结构并额外必填 reason（1～1200 字符），只接受 completed。events 必须有 1～100 条，每条要么 supersedes 本 Session 在操作前已存在的事实，要么关联本批次前面的更正；因此每批必有指向原事实的更正，无关新学习被拒绝。引用仍限于同一 Session，新增事实继续校验来源、依据、练习关系及 Sprint 快照。handoff 必须同步纠正，不能引用已经失效的事实；程序不判断自然语言总结是否准确。
+
+检查点先验证 event_ids 是完整事件序列的下一个连续片段，再计算其当时的有效性和摘要。缺失、乱序、重复分配及类型损坏均通过 load 边界返回带 record.json 路径的 LearningError；CLI 输出 JSON error，退出码 2，原文件保留。
+
 context 默认只展开当前 Track 的 active 和一份 completed。当前 active 尚无 handoff 且明确设置 previous_session_id 时，那份前序优先于完成时间；否则按完成时间选择。显式前序占用 limit 名额，去重后以 recent_order 表明顺序。返回交接、重点事实（text 最多 500 字符，截断带标记）、verified_abilities、unstable_points、unresolved_questions、understanding、omitted_event_count 与路径。仅覆盖选定交接，不是整个 Track 能力汇总；不足时 session-show 按 offset/limit 分页读取。正常读取不加载其他 Goal/Track 历史；规划依赖检查沿用第一阶段规则。
 
 context/resume 的 continuation 为 `{source, source_session_id, handoff}`，source 为 current_session、previous_session、recent_session 或 none。恢复优先使用当前已保存的 handoff，否则仅读直接关联的前序，校验其为同范围且在当前 Session 开始前已结束。resume 的 reference_session 提供前序的精简事实；没有关联就不编造交接。当前 handoff 仍为 null、events 仍为空，引用历史不会算作本次学习。缺失或损坏前序时报错，不静默回退，也不递归加载前序链。
+
+session-list 按 `(created_at, id)` 倒序，offset 为非负整数（默认 0），limit 为 1～100（默认 5），返回 total、offset、next_offset；越界页为空，next_offset 为 null。正常缓存下只加载本页权威记录。数据未新增或删除时能遍历全部历史；分页期间并发插入可能移动偏移，这不是快照游标。
 
 索引保存定位摘要（ID、状态、主题、时间、请求键、关联 ID），以及记录文件大小/修改时间签名和索引内容摘要。结构与摘要合法时复用签名未变的条目，只读取并校验新增或变化的记录；索引缺失或损坏时全量重建。只读恢复仅在内存发生，返回 rebuilt_in_memory，不偷偷写文件。checkpoint/finish 的索引刷新使用同一增量路径；validate/repair 和 start 的前置校验仍全量读取权威记录。目录签名枚举、索引读写仍随 Session 数增长；Python 仍完整校验/重写单份 Session JSON，尚未分片。
 
@@ -82,19 +90,22 @@ context/resume 的 continuation 为 `{source, source_session_id, handoff}`，sou
 
 复用 Hub 互斥锁、安全路径、同目录临时文件、flush/fsync 与原子替换。开始时准备完整目录再重命名发布。
 
-提交顺序：校验整个批次 → 原子替换 record.json → 结束时生成 note.md → 刷新 index.json。record.json 是唯一提交点；没有跨文件数据库事务。
+提交顺序：校验整个批次及既有笔记保护 → 原子替换 record.json → 结束或更正时生成 note.md → 刷新 index.json。record.json 是唯一提交点；没有跨文件数据库事务。更正后的笔记显示当前摘要、历史失效标记和事后更正的时间/理由/事实 ID；原交接保留在检查点中。
 
 | 故障位置 | 恢复方式 |
 |---|---|
 | 记录提交前 | 既有原字节不变，重试原请求 |
 | 记录提交后 | 新事实已保存，重试原 operation_id 不重复追加 |
 | 笔记/索引失败 | context 从记录恢复；重试或 session-repair 补齐派生文件 |
+| 更正已提交、笔记仍为更正前内容 | 从权威检查点还原此前完成版本，旧文件精确匹配其渲染内容时重试/repair 原子更新；人工修改拒绝覆盖 |
 | 笔记冲突/人工修改 | 保留并报错，不自动覆盖；先备份核对 |
 | 修复前程序生成、缺少有效性标记的笔记 | validate 报需升级；仅显式 repair 且逐字节匹配原生成格式时原子更新派生笔记，record.json 不变 |
 | 权威 JSON 损坏、版本未知、摘要不一致 | 报错保留，人工从可信备份恢复；repair 不猜事实 |
 | 残留锁/暂存文件 | 确认没有写入者后人工检查，程序不抢锁或删除 |
 
 相同 operation_id、相同内容重试为无操作；同 ID 不同内容/操作报错。已完成记录的新 finish 请求仅在无新事实且 handoff 相同时按无操作处理，否则拒绝。去重以请求 ID 为边界，无法可靠识别不同 ID 下语义相同的自然语言事实。
+
+更正操作与 checkpoint/finish 共用 operation_id 命名空间。重试原 finish 或较早更正只修复派生文件并返回当前记录，不回退 handoff，不重复追加；更正理由也是去重摘要的一部分。修复过期笔记仅识别历史确定性生成内容，无需引入第二份权威状态。更正只作用于原 Session；不会自动重写另一个 Session 已保存的总结或已完成 Sprint 的验收记录。
 
 validate 全库只读检查结构、范围、历史摘要、引用、状态、笔记与索引，不自动迁移。mtime/size 和 SHA-256 用于事故检测和缓存一致性，不是防恶意篡改签名。网络盘、多机器并发、硬件断电持久性未验证。
 

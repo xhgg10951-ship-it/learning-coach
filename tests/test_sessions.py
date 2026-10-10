@@ -513,6 +513,314 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.read(identity)["events"][0]["sources"], payload["events"][0]["sources"])
 
+    def completed_evidence(self):
+        identity = self.start(sprint="SP001")["id"]
+        exercise = fact("ex-1", "exercise", "exercise_verified", prompt="两个元素的 size？", answer="10",
+                        result="correct", feedback="原批改有误")
+        evidence = fact("claim-1", "evidence", "exercise_verified", criterion="在具体例子中判断 size",
+                        outcome="met", related_ids=["ex-1"])
+        payload = batch("original-finish", [exercise, evidence])
+        self.checkpoint(identity, payload, finish=True)
+        correction = batch("correct-after-finish", [
+            {**exercise, "id": "ex-2", "result": "incorrect", "feedback": "答案应为 2，原批改错误", "supersedes": ["ex-1"]}
+        ])
+        correction["reason"] = "结束后核对题目，发现把容量当作 size 的答案被误判为正确"
+        correction["handoff"]["summary"] = "原达标结论撤回，size 与容量仍需区分"
+        return identity, payload, correction
+
+    def test_review2_completed_session_can_correct_without_reopening(self):
+        identity, original_payload, correction = self.completed_evidence()
+        original = self.read(identity)
+        plan = (self.hub._tdir("java", "core") / "state.json").read_bytes()
+        with self.assertRaises(learning.LearningError):
+            self.checkpoint(identity, batch("ordinary-append", correction["events"]))
+        # A linked new Session cannot supersede foreign facts, and a plain
+        # explanation there cannot retract the original record's claim.
+        active = self.start(request_id="later", previous=identity)["id"]
+        with self.assertRaises(learning.LearningError):
+            self.checkpoint(active, batch("foreign-correction", correction["events"]))
+        self.checkpoint(active, batch("explanation", [fact("later-explanation", "explanation", "ai_assessment")]))
+        self.assertEqual(self.store.show("java", "core", identity)["event_validity"]["claim-1"]["status"], "current")
+        active_bytes = self.store.path("java", "core", active, "record.json").read_bytes()
+        result = self.cli("session-correct", "--goal", "java", "--track", "core", "--session", identity,
+                          "--data", "-", payload=correction)
+        saved = self.read(identity)
+        self.assertEqual(saved["session_version"], 2)
+        self.assertEqual(saved["status"], "completed")
+        self.assertEqual(saved["completed_at"], original["completed_at"])
+        self.assertEqual(saved["events"][:2], original["events"])
+        self.assertEqual(saved["checkpoints"][:1], original["checkpoints"])
+        self.assertEqual(saved["checkpoints"][-1]["reason"], correction["reason"])
+        shown = self.cli("session-show", "--goal", "java", "--track", "core", "--session", identity)
+        self.assertEqual(shown["verified_abilities"], [])
+        self.assertEqual(shown["event_validity"]["claim-1"]["status"], "invalidated")
+        note = Path(result["note_path"]).read_text(encoding="utf-8")
+        self.assertIn("依据已失效", note)
+        self.assertIn(correction["reason"], note)
+        self.assertEqual(self.store.path("java", "core", active, "record.json").read_bytes(), active_bytes)
+        self.assertEqual((self.hub._tdir("java", "core") / "state.json").read_bytes(), plan)
+        self.assertTrue(self.cli("validate")["valid"])
+
+    def test_review2_list_can_reach_session_101_in_new_process(self):
+        identities = []
+        for number in range(101):
+            identity = self.start(request_id=f"history-{number}")["id"]
+            self.checkpoint(identity, batch("finish", []), finish=True)
+            identities.append(identity)
+        before = self.snapshot()
+        first = self.cli("session-list", "--limit", "100")
+        self.assertEqual(first["total"], 101)
+        self.assertEqual(len(first["sessions"]), 100)
+        last = self.cli("session-list", "--limit", "100", "--offset", "100")
+        self.assertEqual(first["next_offset"], 100)
+        self.assertEqual(last["offset"], 100)
+        self.assertIsNone(last["next_offset"])
+        self.assertEqual([item["id"] for item in last["sessions"]], [identities[0]])
+        self.assertEqual({item["id"] for item in first["sessions"] + last["sessions"]}, set(identities))
+        self.assertEqual(before, self.snapshot())
+
+    def test_review2_reversed_checkpoint_returns_path_in_json_error(self):
+        identity, _, _ = self.completed_evidence()
+        record = self.read(identity)
+        record["checkpoints"][0]["event_ids"].reverse()
+        path = self.store.path("java", "core", identity, "record.json")
+        path.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+        before = self.snapshot()
+        error = self.cli("session-context", fail=True)
+        self.assertIn(str(path), error["error"])
+        self.assertEqual(before, self.snapshot())
+
+    def test_review2_correction_retries_and_second_correction_preserve_history(self):
+        identity, finish_payload, correction = self.completed_evidence()
+        original = self.read(identity)
+        self.store.correct("java", "core", identity, correction)
+        before = self.snapshot()
+        self.store.correct("java", "core", identity, correction)
+        self.checkpoint(identity, finish_payload, finish=True)
+        self.assertEqual(before, self.snapshot())
+        self.assertEqual(self.read(identity)["handoff"], correction["handoff"])
+        second = copy.deepcopy(correction)
+        second["operation_id"] = "correction-two"
+        second["reason"] = "进一步核对批改说明"
+        second["events"][0].update(id="ex-3", supersedes=["ex-2"], feedback="补充说明：容量不决定 size")
+        second["handoff"]["focus_ids"] = ["ex-3"]
+        self.store.correct("java", "core", identity, second)
+        saved = self.read(identity)
+        self.assertEqual(len(saved["checkpoints"]), 3)
+        self.assertEqual(saved["completed_at"], original["completed_at"])
+        self.assertEqual(saved["checkpoints"][:1], original["checkpoints"])
+        before = self.snapshot()
+        self.store.correct("java", "core", identity, correction)
+        self.assertEqual(before, self.snapshot())
+        changed = copy.deepcopy(correction)
+        changed["reason"] = "相同请求键但理由不同"
+        with self.assertRaises(learning.LearningError):
+            self.store.correct("java", "core", identity, changed)
+        self.assertEqual(before, self.snapshot())
+        self.assertTrue(self.hub.validate()["valid"])
+
+    def test_review2_correction_rejects_unrelated_or_invalid_payload_atomically(self):
+        identity, _, correction = self.completed_evidence()
+        cases = []
+        for key, value in (("reason", ""), ("events", []), ("events", [fact("unrelated")]),
+                           ("handoff", {**correction["handoff"], "focus_ids": ["claim-1"]})):
+            cases.append({**copy.deepcopy(correction), key: value})
+        cases.append({**copy.deepcopy(correction), "events": correction["events"] + [fact("unrelated")]})
+        cases.append({**copy.deepcopy(correction), "operation_id": "original-finish"})
+        cases.append({key: value for key, value in correction.items() if key != "reason"})
+        before = self.snapshot()
+        for payload in cases:
+            with self.subTest(payload=payload):
+                self.cli("session-correct", "--goal", "java", "--track", "core", "--session", identity,
+                         "--data", "-", payload=payload, fail=True)
+                self.assertEqual(before, self.snapshot())
+        self.hub.create_track("java", "Other", identity="other")
+        before = self.snapshot()
+        self.cli("session-correct", "--goal", "java", "--track", "other", "--session", identity,
+                 "--data", "-", payload=correction, fail=True)
+        self.assertEqual(before, self.snapshot())
+        active = self.start(request_id="still-active")["id"]
+        before = self.snapshot()
+        self.cli("session-correct", "--goal", "java", "--track", "core", "--session", active,
+                 "--data", "-", payload=correction, fail=True)
+        self.assertEqual(before, self.snapshot())
+
+    def test_review2_corrected_predecessor_used_by_new_process(self):
+        identity, _, correction = self.completed_evidence()
+        active = self.start(request_id="continue", previous=identity)["id"]
+        self.store.correct("java", "core", identity, correction)
+        context = self.cli("session-context")
+        self.assertEqual(context["continuation"]["handoff"], correction["handoff"])
+        self.assertEqual(context["recent_sessions"][0]["verified_abilities"], [])
+        resumed = self.cli("session-resume", "--goal", "java", "--track", "core", "--session", active)
+        self.assertEqual(resumed["reference_session"]["verified_abilities"], [])
+        self.assertEqual(resumed["continuation"], context["continuation"])
+        self.assertEqual(self.read(active)["session_version"], 1)
+        self.assertTrue(self.cli("validate")["valid"])
+
+    def test_review2_correction_keeps_completed_time_and_recency_after_pause(self):
+        identity, _, correction = self.completed_evidence()
+        original = self.read(identity)
+        recent = self.start(request_id="newer")["id"]
+        self.checkpoint(recent, batch("finish", []), finish=True)
+        self.hub.transition("java", "goal", "paused", "暂时暂停")
+        self.store.correct("java", "core", identity, correction)
+        self.assertEqual(self.read(identity)["completed_at"], original["completed_at"])
+        self.assertGreaterEqual(self.read(identity)["updated_at"], original["updated_at"])
+        self.assertEqual(self.store.context()["recent_sessions"][0]["id"], recent)
+        self.assertTrue(self.hub.validate()["valid"])
+
+    def test_review2_correction_preserves_manually_edited_note(self):
+        identity, _, correction = self.completed_evidence()
+        note = self.store.path("java", "core", identity, "note.md")
+        note.write_text(note.read_text(encoding="utf-8") + "\n用户补充\n", encoding="utf-8")
+        before = self.snapshot()
+        self.cli("session-correct", "--goal", "java", "--track", "core", "--session", identity,
+                 "--data", "-", payload=correction, fail=True)
+        self.assertEqual(before, self.snapshot())
+
+    def test_review2_correction_commit_failure_preserves_all_bytes(self):
+        identity, _, correction = self.completed_evidence()
+        before = self.snapshot()
+        with mock.patch.object(learning.os, "replace", side_effect=OSError("replace failed")):
+            with self.assertRaises(OSError):
+                self.store.correct("java", "core", identity, correction)
+        self.assertEqual(before, self.snapshot())
+
+    def test_review2_correction_note_failure_is_retryable_from_history(self):
+        identity, _, correction = self.completed_evidence()
+        note = self.store.path("java", "core", identity, "note.md")
+        old_note = note.read_bytes()
+        with mock.patch.object(sessions, "_atomic", side_effect=OSError("note failed")):
+            with self.assertRaises(OSError):
+                self.store.correct("java", "core", identity, correction)
+        canonical = self.store.path("java", "core", identity, "record.json").read_bytes()
+        self.assertEqual(note.read_bytes(), old_note)
+        self.assertEqual(self.cli("session-context")["recent_sessions"][0]["verified_abilities"], [])
+        self.cli("validate", fail=True)
+        self.cli("session-correct", "--goal", "java", "--track", "core", "--session", identity,
+                 "--data", "-", payload=correction)
+        self.assertEqual(self.store.path("java", "core", identity, "record.json").read_bytes(), canonical)
+        self.assertIn("依据已失效", note.read_text(encoding="utf-8"))
+        self.assertTrue(self.hub.validate()["valid"])
+
+    def test_review2_repair_accepts_historical_generated_note_but_not_edits(self):
+        identity, _, correction = self.completed_evidence()
+        note = self.store.path("java", "core", identity, "note.md")
+        old_note = note.read_bytes()
+        self.store.correct("java", "core", identity, correction)
+        current = note.read_bytes()
+        record_bytes = self.store.path("java", "core", identity, "record.json").read_bytes()
+        note.write_bytes(old_note + b"\nuser addition\n")
+        before = self.snapshot()
+        self.cli("session-repair", "--goal", "java", "--track", "core", fail=True)
+        self.assertEqual(before, self.snapshot())
+        note.write_bytes(old_note)
+        self.cli("session-repair", "--goal", "java", "--track", "core")
+        self.assertEqual(note.read_bytes(), current)
+        self.assertEqual(self.store.path("java", "core", identity, "record.json").read_bytes(), record_bytes)
+
+    def test_review2_pagination_boundaries_and_selected_page_reads(self):
+        prior, recent, active = self.continuation_fixture()
+        with mock.patch.object(self.store, "load", wraps=self.store.load) as loads:
+            page = self.store.listing(limit=1, offset=2)
+        self.assertEqual([call.args[2] for call in loads.call_args_list], [prior])
+        self.assertIsNone(page["next_offset"])
+        self.assertEqual(self.cli("session-list", "--offset", "3")["sessions"], [])
+        self.assertEqual(self.cli("session-list", "--offset", "999")["sessions"], [])
+        for args in (("--offset", "-1"), ("--offset", "oops"), ("--limit", "101"), ("--limit", "0")):
+            self.cli("session-list", *args, fail=True)
+        before = self.snapshot()
+        for value in (True, 1.5, -1, "2"):
+            with self.assertRaises(learning.LearningError):
+                self.store.listing(offset=value)
+        self.assertEqual(before, self.snapshot())
+
+    def test_review2_correction_index_failure_and_missing_note_repair(self):
+        identity, _, correction = self.completed_evidence()
+        real_save = sessions._save
+        def fail_index(path, value):
+            if path.name == "index.json":
+                raise OSError("index failed")
+            return real_save(path, value)
+        with mock.patch.object(sessions, "_save", side_effect=fail_index):
+            with self.assertRaises(OSError):
+                self.store.correct("java", "core", identity, correction)
+        path = self.store.path("java", "core", identity, "record.json")
+        canonical = path.read_bytes()
+        self.assertEqual(self.cli("session-context")["recent_sessions"][0]["verified_abilities"], [])
+        self.store.path("java", "core", identity, "note.md").unlink()
+        self.cli("session-repair", "--goal", "java", "--track", "core")
+        self.assertEqual(path.read_bytes(), canonical)
+        self.assertTrue(self.cli("validate")["valid"])
+
+    def test_review2_correction_survives_child_exit_after_commit(self):
+        identity, _, correction = self.completed_evidence()
+        child = """
+import os, sys
+from pathlib import Path
+from scripts import learning, sessions
+save = sessions._save
+def exit_after_commit(path, value):
+    save(path, value)
+    if path.name == 'record.json':
+        os._exit(73)
+sessions._save = exit_after_commit
+raise SystemExit(learning.main(sys.argv[1:]))
+"""
+        result = subprocess.run([sys.executable, "-B", "-c", child, "--hub", str(self.hub.root),
+                                 "session-correct", "--goal", "java", "--track", "core", "--session", identity,
+                                 "--data", "-"], cwd=ROOT, input=json.dumps(correction, ensure_ascii=False),
+                                capture_output=True, encoding="utf-8", timeout=30, env={**os.environ, "PYTHONUTF8": "1"})
+        self.assertEqual(result.returncode, 73, result.stderr)
+        self.assertEqual(result.stdout, "")
+        path = self.store.path("java", "core", identity, "record.json")
+        canonical = path.read_bytes()
+        self.assertEqual(self.cli("session-context")["recent_sessions"][0]["verified_abilities"], [])
+        before = self.snapshot()
+        self.cli("session-correct", "--goal", "java", "--track", "core", "--session", identity,
+                 "--data", "-", payload=correction, fail=True)
+        self.assertEqual(before, self.snapshot())
+        # This test has waited for its own child to exit. Production recovery
+        # still requires an operator to establish that no writer remains.
+        (self.hub.root / ".write.lock").unlink()
+        self.cli("session-repair", "--goal", "java", "--track", "core")
+        self.cli("session-correct", "--goal", "java", "--track", "core", "--session", identity,
+                 "--data", "-", payload=correction)
+        self.assertEqual(path.read_bytes(), canonical)
+        self.assertEqual(len(self.read(identity)["checkpoints"]), 2)
+        self.assertTrue(self.cli("validate")["valid"])
+
+    def test_review2_corrupt_checkpoint_dependencies_are_structured_and_readonly(self):
+        identity, _, correction = self.completed_evidence()
+        self.store.correct("java", "core", identity, correction)
+        original = self.read(identity)
+        path = self.store.path("java", "core", identity, "record.json")
+        variants = []
+        for event_ids in (["claim-1"], ["ex-1", "ex-1"], ["missing"], None):
+            value = copy.deepcopy(original)
+            value["checkpoints"][0]["event_ids"] = event_ids
+            variants.append(value)
+        value = copy.deepcopy(original)
+        del value["checkpoints"][-1]["reason"]
+        variants.append(value)
+        value = copy.deepcopy(original)
+        value["session_version"] = 1
+        variants.append(value)
+        value = copy.deepcopy(original)
+        value["checkpoints"][1]["kind"] = "checkpoint"
+        variants.append(value)
+        value = copy.deepcopy(original)
+        value["completed_at"] = value["updated_at"]
+        variants.append(value)
+        for damaged in variants:
+            with self.subTest(damaged=damaged):
+                path.write_text(json.dumps(damaged, ensure_ascii=False), encoding="utf-8")
+                before = self.snapshot()
+                for args in (("session-context",), ("validate",), ("session-repair", "--goal", "java", "--track", "core")):
+                    self.assertIn(str(path), self.cli(*args, fail=True)["error"])
+                    self.assertEqual(before, self.snapshot())
+
     def corrected_session(self):
         identity = self.start(sprint="SP001")["id"]
         exercise = fact("exercise-1", "exercise", "exercise_verified", prompt="题目", answer="2", result="correct", feedback="正确")

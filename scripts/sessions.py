@@ -154,6 +154,8 @@ def event_validity(events):
             replacements.setdefault(target, []).append(identity)
     validity = {}
     for identity, event in events.items():
+        if any(key not in validity for key in event.get("related_ids", [])):
+            raise LearningError(f"事实 {identity} 的依赖不存在或尚未按顺序提供")
         superseded_by = replacements.get(identity, [])
         invalidated_by = [key for key in event.get("related_ids", [])
                           if event["basis"] == "exercise_verified" and validity[key]["status"] != "current"]
@@ -166,6 +168,19 @@ def event_validity(events):
             "correction_ids": sorted(corrections),
         }
     return validity
+
+
+def check_correction(events, previous):
+    """A correction must retract old facts; extra facts must explain that correction."""
+    if not events:
+        raise LearningError("更正必须追加事实并用 supersedes 指向原事实")
+    connected = set()
+    for event in events:
+        references = event.get("supersedes", []) + event.get("related_ids", [])
+        if not (any(key in previous for key in event.get("supersedes", [])) or
+                any(key in connected for key in references)):
+            raise LearningError("更正事实必须替代本 Session 既有事实，或关联本批次前面的更正；新学习请新建 Session")
+        connected.add(event["id"])
 
 
 def check_handoff(value, events):
@@ -188,6 +203,12 @@ def render_note(record, *, annotate_validity=True):
              f"开始：{record['created_at']}；结束：{record['completed_at']}", "",
              "本文件由 record.json 生成；机器状态以 JSON 为准。Session 完成不代表 Sprint 完成。", "",
              "## 本次摘要", "", record["handoff"]["summary"], ""]
+    corrections = [item for item in record["checkpoints"] if item["kind"] == "correction"]
+    if corrections:
+        lines += ["## 结束后更正", "", "以下记录是事后更正，学习结束时间保持不变。原事实及当时交接保留在 record.json。", ""]
+        for item in corrections:
+            lines += [f"### {item['operation_id']} · {item['at']}", "", f"理由：{item['reason']}", "",
+                      f"更正事实：{', '.join(item['event_ids'])}", ""]
     for kind, label in LABELS.items():
         lines += [f"## {label}", ""]
         matching = [event for event in record["events"] if event["kind"] == kind]
@@ -225,6 +246,19 @@ def render_note(record, *, annotate_validity=True):
     return "\n".join(lines)
 
 
+def prior_completed_revisions(record):
+    """Reconstruct only immutable completed prefixes to recognize stale generated notes."""
+    events = {event["id"]: event for event in record["events"]}
+    for number, checkpoint in enumerate(record["checkpoints"]):
+        if checkpoint["kind"] != "correction":
+            continue
+        checkpoints = record["checkpoints"][:number]
+        last = checkpoints[-1]
+        yield {**record, "session_version": 1 if last["kind"] == "finish" else 2,
+               "checkpoints": checkpoints, "updated_at": last["at"], "handoff": last["handoff"],
+               "events": [events[key] for item in checkpoints for key in item["event_ids"]]}
+
+
 class SessionStore:
     def __init__(self, hub):
         self.hub = hub
@@ -249,8 +283,14 @@ class SessionStore:
         return goal, track, self.hub.get_track(goal, track)
 
     def load(self, goal, track, identity, state):
-        record = _load(self.path(goal, track, identity, "record.json"))
-        self.check_record(record, goal, track, identity, state)
+        path = self.path(goal, track, identity, "record.json")
+        try:
+            record = _load(path)
+            self.check_record(record, goal, track, identity, state)
+        except (LearningError, KeyError, TypeError, ValueError, IndexError, OverflowError) as exc:
+            # Keep malformed on-disk data inside the CLI's structured error
+            # contract. Do not catch arbitrary errors from unrelated operations.
+            raise LearningError(f"Session 记录错误: {path}: {exc}") from exc
         return record
 
     def check_record(self, record, goal, track, identity, state):
@@ -258,7 +298,7 @@ class SessionStore:
                         "sprint_id", "sprint_snapshot", "topic", "status", "created_at", "updated_at",
                         "completed_at", "start_request_id", "previous_session_id", "events",
                         "checkpoints", "handoff", "extensions"})
-        if type(record["session_version"]) is not int or record["session_version"] != 1 or record["kind"] != "session":
+        if type(record["session_version"]) is not int or record["session_version"] not in (1, 2) or record["kind"] != "session":
             raise LearningError("不支持的 Session 版本或类型；不自动迁移")
         if (record["id"], record["goal_id"], record["track_id"]) != (identity, goal, track):
             raise LearningError("Session 身份与所属 Goal/Track 不匹配")
@@ -294,35 +334,55 @@ class SessionStore:
             check_event(event, events, sprint)
             events[event["id"]] = event
         seen, assigned, available = set(), [], {}
+        event_order = list(events)
+        finished_at, correction_count = None, 0
         last_at = record["created_at"]
         for number, checkpoint in enumerate(record["checkpoints"]):
-            fields(checkpoint, {"operation_id", "kind", "at", "event_ids", "handoff", "digest"})
+            fields(checkpoint, {"operation_id", "kind", "at", "event_ids", "handoff", "digest"}, {"reason"})
             _id(checkpoint["operation_id"], "operation")
-            if checkpoint["operation_id"] in seen or checkpoint["kind"] not in ("checkpoint", "finish"):
+            kind = checkpoint["kind"]
+            if checkpoint["operation_id"] in seen or kind not in ("checkpoint", "finish", "correction"):
                 raise LearningError("检查点操作重复或类型错误")
             seen.add(checkpoint["operation_id"])
-            if checkpoint["kind"] == "finish" and number != len(record["checkpoints"]) - 1:
-                raise LearningError("finish 必须为最后一个检查点")
+            if kind == "correction":
+                if record["session_version"] != 2 or finished_at is None:
+                    raise LearningError("correction 仅允许在版本 2 已结束 Session 的 finish 之后")
+                text(checkpoint.get("reason"), "correction.reason", 1200)
+                correction_count += 1
+            elif finished_at is not None or "reason" in checkpoint:
+                raise LearningError("finish 之后仅允许 correction；普通检查点不接受 reason")
+            if kind == "finish":
+                finished_at = checkpoint["at"]
             if timestamp(checkpoint["at"]) < timestamp(last_at):
                 raise LearningError("检查点时间顺序错误")
             last_at = checkpoint["at"]
             ids(checkpoint["event_ids"], "event_ids")
-            if any(key not in events for key in checkpoint["event_ids"]):
-                raise LearningError("检查点引用不存在的事实")
+            # Validate the exact contiguous prefix before computing dependencies.
+            # Reordered, missing or duplicate assignments must never reach the
+            # validity walk with a partially ordered event map.
+            end = len(assigned) + len(checkpoint["event_ids"])
+            if checkpoint["event_ids"] != event_order[len(assigned):end]:
+                raise LearningError("检查点 event_ids 必须按顺序连续覆盖事实，不允许缺失、重复或重排")
+            batch_events = [events[key] for key in checkpoint["event_ids"]]
+            if kind == "correction":
+                check_correction(batch_events, available)
             assigned.extend(checkpoint["event_ids"])
             available.update((key, events[key]) for key in checkpoint["event_ids"])
             check_handoff(checkpoint["handoff"], available)
             payload = {"operation_id": checkpoint["operation_id"],
-                       "events": [events[key] for key in checkpoint["event_ids"]], "handoff": checkpoint["handoff"]}
+                       "events": batch_events, "handoff": checkpoint["handoff"]}
+            if kind == "correction":
+                payload["reason"] = checkpoint["reason"]
             if digest(payload) != checkpoint["digest"]:
                 raise LearningError("检查点摘要校验失败；原始事实或交接被修改")
         if assigned != list(events) or record["updated_at"] != last_at:
             raise LearningError("检查点与事实顺序或更新时间不一致")
         if record["handoff"] != (record["checkpoints"][-1]["handoff"] if seen else None):
             raise LearningError("当前交接与最后检查点不一致")
-        finished = bool(seen and record["checkpoints"][-1]["kind"] == "finish")
-        if finished != (record["status"] == "completed") or record["completed_at"] != (last_at if finished else None):
+        if (finished_at is not None) != (record["status"] == "completed") or record["completed_at"] != finished_at:
             raise LearningError("Session 完成状态与结束检查点不一致")
+        if (record["session_version"] == 2) != bool(correction_count):
+            raise LearningError("版本 2 必须保留至少一条结束后更正；版本 1 不接受该扩展")
         fields(record["extensions"], {"knowledge_ids", "review_candidates"})
         for key, value in record["extensions"].items():
             ids(value, key)
@@ -370,7 +430,7 @@ class SessionStore:
             if item["status"] not in ("active", "completed"):
                 raise LearningError("索引状态错误")
             if item["status"] == "completed":
-                if timestamp(item["completed_at"]) != timestamp(item["updated_at"]):
+                if not timestamp(item["created_at"]) <= timestamp(item["completed_at"]) <= timestamp(item["updated_at"]):
                     raise LearningError("索引完成时间错误")
             elif item["completed_at"] is not None:
                 raise LearningError("active 索引不应有完成时间")
@@ -449,7 +509,14 @@ class SessionStore:
         if path.exists():
             actual = path.read_bytes()
             if actual != expected.encode("utf-8"):
-                if actual == render_note(record, annotate_validity=False).encode("utf-8"):
+                # A committed correction can outlive its note write. Recognize
+                # exact prior generated revisions, never arbitrary note text.
+                revisions = list(prior_completed_revisions(record))
+                if any(actual == render_note(prior).encode("utf-8") for prior in revisions):
+                    _atomic(path, expected)
+                    return
+                if any(actual == render_note(prior, annotate_validity=False).encode("utf-8")
+                       for prior in [record, *revisions] if prior["session_version"] == 1):
                     if upgrade_notes:
                         _atomic(path, expected)
                         return
@@ -461,6 +528,8 @@ class SessionStore:
     def result(self, record):
         goal, track, identity = record["goal_id"], record["track_id"], record["id"]
         return {**self.entry(record), "goal_id": goal, "track_id": track, "persisted": True,
+                "session_version": record["session_version"],
+                "correction_count": sum(item["kind"] == "correction" for item in record["checkpoints"]),
                 "event_count": len(record["events"]), "checkpoint_count": len(record["checkpoints"]),
                 "record_path": str(self.path(goal, track, identity, "record.json")),
                 "note_path": str(self.path(goal, track, identity, "note.md")) if record["status"] == "completed" else None,
@@ -504,15 +573,22 @@ class SessionStore:
             self.write_index(goal, track, state)
             return self.result(record)
 
-    def checkpoint(self, goal, track, identity, payload, finish=False):
-        fields(payload, {"operation_id", "events", "handoff"})
+    def correct(self, goal, track, identity, payload):
+        return self.checkpoint(goal, track, identity, payload, correction=True)
+
+    def checkpoint(self, goal, track, identity, payload, finish=False, *, correction=False):
+        if finish and correction:
+            raise LearningError("finish 与 correction 是独立操作")
+        fields(payload, {"operation_id", "events", "handoff"} | ({"reason"} if correction else set()))
         _id(payload["operation_id"], "operation")
+        if correction:
+            text(payload["reason"], "correction.reason", 1200)
         if not isinstance(payload["events"], list) or len(payload["events"]) > 100:
             raise LearningError("一次检查点最多 100 条事实")
         with self.hub._lock():
             goal, track, state = self.scope(goal, track)
             record = self.load(goal, track, identity, state)
-            kind = "finish" if finish else "checkpoint"
+            kind = "correction" if correction else "finish" if finish else "checkpoint"
             retry = next((item for item in record["checkpoints"] if item["operation_id"] == payload["operation_id"]), None)
             if retry:
                 if retry["kind"] != kind or retry["digest"] != digest(payload):
@@ -520,16 +596,20 @@ class SessionStore:
                 self.materialize(record)
                 self.write_index(goal, track, state)
                 return self.result(record)
-            if record["status"] == "completed":
+            if correction and record["status"] != "completed":
+                raise LearningError("session-correct 仅用于已结束 Session；学习中更正请使用 session-checkpoint")
+            if record["status"] == "completed" and not correction:
                 if finish and not payload["events"] and payload["handoff"] == record["handoff"]:
                     self.materialize(record)
                     self.write_index(goal, track, state)
                     return self.result(record)
-                raise LearningError("Session 已结束；不能追加或重新打开。重试使用原 operation_id 和内容")
+                raise LearningError("Session 已结束；不能普通追加或重新打开。更正旧事实用 session-correct；重试使用原 operation_id 和内容")
             events = {event["id"]: event for event in record["events"]}
             for event in payload["events"]:
                 check_event(event, events, record["sprint_snapshot"])
                 events[event["id"]] = event
+            if correction:
+                check_correction(payload["events"], {event["id"] for event in record["events"]})
             check_handoff(payload["handoff"], events)
             # Check derived-file conflicts before committing any new facts.
             self.materialize(record)
@@ -540,6 +620,9 @@ class SessionStore:
             record["checkpoints"].append({"operation_id": payload["operation_id"], "kind": kind,
                                            "at": stamp, "event_ids": [item["id"] for item in payload["events"]],
                                            "handoff": copy.deepcopy(payload["handoff"]), "digest": digest(payload)})
+            if correction:
+                record["session_version"] = 2
+                record["checkpoints"][-1]["reason"] = payload["reason"]
             if finish:
                 record["status"], record["completed_at"] = "completed", stamp
             self.check_record(record, goal, track, identity, state)
@@ -633,12 +716,16 @@ class SessionStore:
         return {"mode": "resume", "session": self.compact(record), "continuation": continuation,
                 "reference_session": self.compact(reference) if reference else None}
 
-    def listing(self, goal=None, track=None, limit=5):
+    def listing(self, goal=None, track=None, limit=5, offset=0):
         self.limit(limit)
+        if type(offset) is not int or offset < 0:
+            raise LearningError("offset 必须为非负整数")
         goal, track, state = self.scope(goal, track)
         entries, cache = self.catalog(goal, track, state)
+        end = offset + limit
         return {"goal_id": goal, "track_id": track, "total": len(entries), "index_status": cache,
-                "sessions": [self.result(self.load(goal, track, item["id"], state)) for item in entries[:limit]]}
+                "offset": offset, "next_offset": end if end < len(entries) else None,
+                "sessions": [self.result(self.load(goal, track, item["id"], state)) for item in entries[offset:end]]}
 
     def show(self, goal, track, identity, offset=0, limit=20):
         self.limit(limit)
@@ -668,7 +755,7 @@ class SessionStore:
                 note = self.path(goal, track, entry["id"], "note.md")
                 if record["status"] == "completed":
                     if not note.exists() or note.read_bytes() != render_note(record).encode("utf-8"):
-                        raise LearningError(f"笔记缺失、需升级有效性标记或冲突: {note}；运行 session-repair，仅补写缺失或精确匹配旧格式的派生笔记")
+                        raise LearningError(f"笔记缺失、过期、需升级有效性标记或冲突: {note}；运行 session-repair，仅补写缺失或精确匹配历史生成内容的派生笔记")
                 elif note.exists():
                     raise LearningError(f"active Session 不应存在笔记: {note}")
         if entries or (self.directory(goal, track) / "index.json").exists():
@@ -688,23 +775,23 @@ class SessionStore:
 
 
 def add_commands(commands):
-    for name in ("session-start", "session-checkpoint", "session-finish", "session-resume",
+    for name in ("session-start", "session-checkpoint", "session-finish", "session-correct", "session-resume",
                  "session-context", "session-list", "session-show", "session-repair"):
         command = commands.add_parser(name)
         for key in ("goal", "track"):
             command.add_argument(f"--{key}", required=name not in {"session-context", "session-list"})
-        if name in {"session-checkpoint", "session-finish", "session-resume", "session-show"}:
+        if name in {"session-checkpoint", "session-finish", "session-correct", "session-resume", "session-show"}:
             command.add_argument("--session", required=True)
         if name == "session-start":
             command.add_argument("--topic", required=True)
             command.add_argument("--request-id", required=True)
             command.add_argument("--sprint")
             command.add_argument("--from-session")
-        if name in {"session-checkpoint", "session-finish"}:
+        if name in {"session-checkpoint", "session-finish", "session-correct"}:
             command.add_argument("--data", required=True, help="UTF-8 JSON 文件；- 从 stdin 读取")
         if name in {"session-context", "session-list", "session-show"}:
             command.add_argument("--limit", type=int, default={"session-context": 1, "session-list": 5, "session-show": 20}[name])
-        if name == "session-show":
+        if name in {"session-show", "session-list"}:
             command.add_argument("--offset", type=int, default=0)
 
 
@@ -714,12 +801,14 @@ def run(store, args):
         return store.start(args.goal, args.track, args.topic, args.request_id, args.sprint, args.from_session)
     if name in {"session-checkpoint", "session-finish"}:
         return store.checkpoint(args.goal, args.track, args.session, read_payload(args.data), finish=name == "session-finish")
+    if name == "session-correct":
+        return store.correct(args.goal, args.track, args.session, read_payload(args.data))
     if name == "session-resume":
         return store.resume(args.goal, args.track, args.session)
     if name == "session-context":
         return store.context(args.goal, args.track, args.limit)
     if name == "session-list":
-        return store.listing(args.goal, args.track, args.limit)
+        return store.listing(args.goal, args.track, args.limit, args.offset)
     if name == "session-show":
         return store.show(args.goal, args.track, args.session, args.offset, args.limit)
     if name == "session-repair":

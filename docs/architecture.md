@@ -86,7 +86,7 @@ learning-hub/
 
 ## 状态与层级约束
 
-下面的暂停、跳过和父子推进规则适用于规划层级。Session 独立采用 active → completed，不要求能力验收、不自动完成 Sprint；保存原有事实和结束记录不受上层后来暂停的影响。开始与恢复学习仍要求 Goal/Track active。
+下面的暂停、跳过和父子推进规则适用于规划层级。Session 独立采用 active → completed，不要求能力验收、不自动完成 Sprint；保存原有事实、结束记录及更正不受上层后来暂停的影响。结束后可用 session-correct 追加有理由的更正，保留 completed 和原结束时间。开始与恢复学习仍要求 Goal/Track active。
 
 | 层级 | 支持的状态 | 终态 |
 |---|---|---|
@@ -130,8 +130,9 @@ CLI 位于 `scripts/learning.py`；全局 `--hub` 位于子命令之前：
 | `validate` | 全库结构和状态检查，不修复或覆盖文件 |
 | `session-spec` | 保留第一阶段只读兼容描述；真正开始学习使用 session-start |
 | `session-start`、`session-checkpoint`、`session-finish` | 稳定 ID、批量事实、重要检查点和结束笔记 |
+| `session-correct` | 在原 completed Session 追加更正、撤回失效证据并更新派生笔记，不重新打开学习 |
 | `session-context`、`session-resume` | 精简交接、恢复 active；completed 只作为新 Session 的参考 |
-| `session-list`、`session-show`、`session-repair` | 最近 N 次摘要、事实分页、派生文件恢复 |
+| `session-list`、`session-show`、`session-repair` | 历史摘要与事实分页、派生文件恢复 |
 
 真实可运行示例见 [onboarding](../references/onboarding.md)、[planning](../references/planning.md) 和 [progress](../references/progress.md)。各命令的完整参数以 `python scripts/learning.py <子命令> --help` 为准。
 

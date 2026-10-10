@@ -1,6 +1,6 @@
 # Session 学习笔记结构
 
-<!-- note.md 由 session-finish 从 record.json 确定性生成。本模板是内容检查指南，不是人工复制的状态文件。不得填写没有发生的事实；旧格式见 legacy/session.md。 -->
+<!-- note.md 由 session-finish/session-correct 从 record.json 确定性生成。本模板是内容检查指南，不是人工复制的状态文件。不得填写没有发生的事实；旧格式见 legacy/session.md。 -->
 
 - 稳定 Session ID、Goal、Track、可选 Sprint、实际主题。
 - 开始和结束时间（元数据，不证明学习时长或掌握）。
@@ -8,6 +8,10 @@
 ## 本次摘要
 
 只概括真实发生的学习。
+
+## 结束后更正（仅有更正时）
+
+更正操作 ID、时间、理由和事实 ID。原学习完成时间不变，原事实及当时的交接在 record.json 中保留；这里不代表新增学习时长或完成一次新的 Session。
 
 ## 实际学习内容
 
