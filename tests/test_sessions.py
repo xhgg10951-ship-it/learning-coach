@@ -513,6 +513,231 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.read(identity)["events"][0]["sources"], payload["events"][0]["sources"])
 
+    def corrected_session(self):
+        identity = self.start(sprint="SP001")["id"]
+        exercise = fact("exercise-1", "exercise", "exercise_verified", prompt="题目", answer="2", result="correct", feedback="正确")
+        evidence = fact("evidence-1", "evidence", "exercise_verified", criterion="在具体例子中判断 size",
+                        outcome="met", related_ids=["exercise-1"])
+        self.checkpoint(identity, batch(events=[exercise, evidence]))
+        corrected = {**exercise, "id": "exercise-2", "result": "incorrect", "feedback": "重新核对为错误", "supersedes": ["exercise-1"]}
+        self.checkpoint(identity, batch("corrected", [corrected]))
+        result = self.checkpoint(identity, batch("finish", [], ["exercise-2"]), finish=True)
+        return identity, result
+
+    def test_review_corrected_evidence_is_marked_in_finished_note(self):
+        identity, result = self.corrected_session()
+        original = self.read(identity)
+        note = Path(result["note_path"]).read_text(encoding="utf-8")
+        exercise_section = note.split("### exercise-1", 1)[1].split("###", 1)[0]
+        evidence_section = note.split("### evidence-1", 1)[1].split("## 下一次交接", 1)[0]
+        self.assertIn("已更正", exercise_section)
+        self.assertIn("exercise-2", exercise_section)
+        self.assertIn("依据已失效", evidence_section)
+        self.assertIn("exercise-1", evidence_section)
+        self.assertIn("exercise-2", evidence_section)
+        self.assertIn("历史证据判断：met", evidence_section)
+        context = self.cli("session-context")
+        self.assertEqual(context["recent_sessions"][0]["verified_abilities"], [])
+        self.assertEqual(self.read(identity), original)
+        self.assertTrue(self.cli("validate")["valid"])
+
+    def continuation_fixture(self):
+        prior = self.start(request_id="a", topic="用户选择的旧主题 A")["id"]
+        prior_payload = batch("finish-a")
+        prior_payload["handoff"]["summary"] = "A 的真实学习记录"
+        prior_payload["handoff"]["next_step"] = "继续 A 的未解决问题"
+        self.checkpoint(prior, prior_payload, finish=True)
+        recent = self.start(request_id="b", topic="较新的另一个主题 B")["id"]
+        recent_payload = batch("finish-b")
+        recent_payload["handoff"]["summary"] = "B 的真实学习记录"
+        self.checkpoint(recent, recent_payload, finish=True)
+        active = self.start(request_id="c", topic="继续 A", previous=prior)["id"]
+        return prior, recent, active
+
+    def test_review_empty_session_resumes_explicit_predecessor_in_fresh_process(self):
+        prior, recent, active = self.continuation_fixture()
+        before = self.snapshot()
+        context = self.cli("session-context")
+        self.assertEqual(context["recent_sessions"][0]["id"], prior)
+        self.assertEqual(context["continuation"]["source_session_id"], prior)
+        self.assertEqual(context["continuation"]["handoff"]["summary"], "A 的真实学习记录")
+        self.assertEqual(context["active_session"]["id"], active)
+        self.assertIsNone(context["active_session"]["handoff"])
+        resumed = self.cli("session-resume", "--goal", "java", "--track", "core", "--session", active)
+        self.assertEqual(resumed["continuation"], context["continuation"])
+        self.assertEqual(resumed["reference_session"]["id"], prior)
+        self.assertEqual(resumed["session"]["event_count"], 0)
+        self.assertEqual(before, self.snapshot())
+
+    def test_review_checkpoint_does_not_load_unchanged_session_history(self):
+        for number in range(2):
+            identity = self.start(request_id=f"old-{number}")["id"]
+            self.checkpoint(identity, batch("finish"), finish=True)
+        active = self.start(request_id="current")["id"]
+        with mock.patch.object(self.store, "load", wraps=self.store.load) as loads:
+            self.checkpoint(active)
+        loaded_ids = [call.args[2] for call in loads.call_args_list]
+        self.assertEqual(loaded_ids, [active, active])
+        self.assertTrue(self.hub.validate()["valid"])
+
+    def legacy_corrected_note(self, record):
+        template = (ROOT / "tests/fixtures/session-note-before-validity.md").read_text(encoding="utf-8")
+        return (template.replace("__SESSION_ID__", record["id"])
+                .replace("__CREATED_AT__", record["created_at"]).replace("__COMPLETED_AT__", record["completed_at"]))
+
+    def test_review_old_generated_note_requires_explicit_safe_upgrade(self):
+        identity, result = self.corrected_session()
+        record = self.read(identity)
+        legacy = self.legacy_corrected_note(record)
+        self.assertEqual(legacy, sessions.render_note(record, annotate_validity=False))
+        path = Path(result["note_path"])
+        path.write_text(legacy, encoding="utf-8", newline="\n")
+        before = self.snapshot()
+        self.cli("validate", fail=True)
+        self.cli("session-context")
+        with self.assertRaisesRegex(learning.LearningError, "旧版笔记"):
+            self.checkpoint(identity, batch("finish", [], ["exercise-2"]), finish=True)
+        self.assertEqual(before, self.snapshot())
+        self.cli("session-repair", "--goal", "java", "--track", "core")
+        self.assertIn("依据已失效", path.read_text(encoding="utf-8"))
+        after = self.snapshot()
+        changed = [key for key in before if before[key] != after[key]]
+        self.assertEqual(changed, [path.relative_to(self.hub.root).as_posix()])
+        self.assertTrue(self.cli("validate")["valid"])
+        self.store.repair("java", "core")
+        self.assertEqual(after, self.snapshot())
+
+    def test_review_old_note_with_user_edit_is_never_overwritten(self):
+        identity, result = self.corrected_session()
+        note = self.legacy_corrected_note(self.read(identity)) + "\n用户补充：还需要核对批改。\n"
+        Path(result["note_path"]).write_text(note, encoding="utf-8", newline="\n")
+        before = self.snapshot()
+        self.cli("session-repair", "--goal", "java", "--track", "core", fail=True)
+        self.assertEqual(before, self.snapshot())
+
+    def test_review_failed_note_upgrade_preserves_old_bytes(self):
+        identity, result = self.corrected_session()
+        path = Path(result["note_path"])
+        path.write_text(self.legacy_corrected_note(self.read(identity)), encoding="utf-8", newline="\n")
+        before = self.snapshot()
+        with mock.patch.object(learning.os, "replace", side_effect=OSError("upgrade interrupted")):
+            with self.assertRaises(OSError):
+                self.store.repair("java", "core")
+        self.assertEqual(before, self.snapshot())
+
+    def test_review_invalidation_cascades_and_new_evidence_stays_current(self):
+        identity = self.start(sprint="SP001")["id"]
+        original = fact("e-1", "exercise", "exercise_verified", prompt="题目", answer="2", result="correct", feedback="正确")
+        first = fact("claim-1", "evidence", "exercise_verified", criterion="在具体例子中判断 size",
+                     outcome="met", related_ids=["e-1"])
+        dependent = {**first, "id": "claim-2", "related_ids": ["e-1", "claim-1"]}
+        self.checkpoint(identity, batch(events=[original, first, dependent]))
+        corrected = {**original, "id": "e-2", "result": "incorrect", "feedback": "先前批改有误", "supersedes": ["e-1"]}
+        self.checkpoint(identity, batch("correction", [corrected]))
+        new_exercise = {**original, "id": "e-3", "prompt": "另外一个例子", "answer": "独立作答"}
+        new_evidence = {**first, "id": "claim-3", "related_ids": ["e-3"]}
+        result = self.checkpoint(identity, batch("finish", [new_exercise, new_evidence]), finish=True)
+        shown = self.cli("session-show", "--goal", "java", "--track", "core", "--session", identity)
+        validity = shown["event_validity"]
+        self.assertEqual(validity["e-1"]["status"], "superseded")
+        self.assertEqual(validity["claim-2"]["status"], "invalidated")
+        self.assertEqual(validity["claim-2"]["correction_ids"], ["e-2"])
+        self.assertEqual(validity["claim-3"]["status"], "current")
+        self.assertEqual([event["id"] for event in shown["verified_abilities"]], ["claim-3"])
+        note = Path(result["note_path"]).read_text(encoding="utf-8")
+        self.assertIn("历史证据判断：met", note.split("### claim-2", 1)[1].split("### claim-3", 1)[0])
+        self.assertNotIn("依据已失效", note.split("### claim-3", 1)[1])
+        self.assertEqual(self.read(identity)["events"][:3], [original, first, dependent])
+        self.assertTrue(self.hub.validate()["valid"])
+
+    def test_review_recovery_reads_only_one_explicit_predecessor(self):
+        prior, recent, active = self.continuation_fixture()
+        with mock.patch.object(self.store, "load", wraps=self.store.load) as loads:
+            context = self.store.context()
+        self.assertEqual([call.args[2] for call in loads.call_args_list], [active, prior])
+        self.assertEqual(context["recent_order"], "explicit_predecessor_first")
+        with mock.patch.object(self.store, "load", wraps=self.store.load) as loads:
+            self.store.resume("java", "core", active)
+        self.assertEqual([call.args[2] for call in loads.call_args_list], [active, prior])
+        expanded = self.store.context(limit=2)
+        self.assertEqual([item["id"] for item in expanded["recent_sessions"]], [prior, recent])
+        self.assertEqual([item["id"] for item in self.store.listing()["sessions"]], [active, recent, prior])
+
+    def test_review_current_checkpoint_takes_priority_over_predecessor(self):
+        prior, recent, active = self.continuation_fixture()
+        payload = batch()
+        payload["handoff"]["summary"] = "C 已经开始自己的学习"
+        self.checkpoint(active, payload)
+        with mock.patch.object(self.store, "load", wraps=self.store.load) as loads:
+            resumed = self.store.resume("java", "core", active)
+        self.assertEqual([call.args[2] for call in loads.call_args_list], [active])
+        self.assertIsNone(resumed["reference_session"])
+        self.assertEqual(resumed["continuation"]["source"], "current_session")
+        self.assertEqual(resumed["continuation"]["handoff"], payload["handoff"])
+        context = self.cli("session-context")
+        self.assertEqual(context["continuation"], resumed["continuation"])
+        self.assertEqual(context["recent_sessions"][0]["id"], recent)
+
+    def test_review_missing_or_corrupt_predecessor_never_falls_back(self):
+        prior, recent, active = self.continuation_fixture()
+        path = self.store.path("java", "core", prior, "record.json")
+        path.unlink()
+        before = self.snapshot()
+        self.cli("session-resume", "--goal", "java", "--track", "core", "--session", active, fail=True)
+        self.cli("session-context", fail=True)
+        self.assertEqual(before, self.snapshot())
+        path.write_text("{broken", encoding="utf-8")
+        before = self.snapshot()
+        self.cli("session-resume", "--goal", "java", "--track", "core", "--session", active, fail=True)
+        self.cli("session-context", fail=True)
+        self.assertEqual(before, self.snapshot())
+
+    def test_review_no_predecessor_does_not_invent_a_handoff(self):
+        active = self.start()["id"]
+        resumed = self.store.resume("java", "core", active)
+        self.assertEqual(resumed["continuation"], {"source": "none", "source_session_id": None, "handoff": None})
+        self.assertIsNone(resumed["reference_session"])
+
+    def test_review_changed_history_is_revalidated_during_index_refresh(self):
+        prior, recent, active = self.continuation_fixture()
+        path = self.store.path("java", "core", prior, "record.json")
+        damaged = self.read(prior)
+        damaged["events"][0]["text"] = "未经授权改写事实"
+        path.write_text(json.dumps(damaged, ensure_ascii=False), encoding="utf-8")
+        damaged_bytes = path.read_bytes()
+        with self.assertRaises(learning.LearningError):
+            self.checkpoint(active)
+        # The canonical checkpoint commits before index refresh. It stays valid
+        # and is never rolled back to hide an unrelated damaged historical file.
+        self.assertEqual(len(self.read(active)["events"]), 1)
+        self.assertEqual(path.read_bytes(), damaged_bytes)
+        with self.assertRaises(learning.LearningError):
+            self.hub.validate()
+
+    def test_review_invalid_cache_falls_back_to_full_canonical_reads(self):
+        prior, recent, active = self.continuation_fixture()
+        index = self.store.directory("java", "core") / "index.json"
+        index.write_text("{broken", encoding="utf-8")
+        with mock.patch.object(self.store, "load", wraps=self.store.load) as loads:
+            self.checkpoint(active)
+        self.assertEqual(set(call.args[2] for call in loads.call_args_list), {prior, recent, active})
+        self.assertTrue(self.hub.validate()["valid"])
+
+    def test_review_full_validation_and_repair_ignore_cache_signatures(self):
+        prior, recent, active = self.continuation_fixture()
+        path = self.store.path("java", "core", prior, "record.json")
+        before_stat = path.stat()
+        data = path.read_bytes().replace("实际学习内容".encode("utf-8"), "伪造学习内容".encode("utf-8"), 1)
+        self.assertEqual(len(data), before_stat.st_size)
+        path.write_bytes(data)
+        os.utime(path, ns=(before_stat.st_atime_ns, before_stat.st_mtime_ns))
+        before = self.snapshot()
+        with self.assertRaises(learning.LearningError):
+            self.hub.validate()
+        with self.assertRaises(learning.LearningError):
+            self.store.repair("java", "core")
+        self.assertEqual(before, self.snapshot())
+
 
 if __name__ == "__main__":
     unittest.main()

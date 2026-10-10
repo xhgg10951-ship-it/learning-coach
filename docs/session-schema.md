@@ -50,6 +50,8 @@ basis 只能是 user_report（用户自报）、ai_assessment（AI 判断）、e
 
 可选 `related_ids`、`supersedes` 引用已保存或本批较早出现的事实，不允许缺失、循环或前向引用。supersedes 表示修订，保留旧原文；当前重点不能指向已被替代的事实。可选 knowledge_ids/review_candidates 字符串 ID 数组仅保存，不执行知识关联或复习逻辑。
 
+`event_validity` 是从上述关系推导的只读结果，不写回 record.json：直接被替代为 superseded；exercise_verified 事实依赖的 related_ids 已失效时为 invalidated，可向后传递；其他为 current。结果同时给出 superseded_by、invalidated_by、correction_ids。交接校验、摘要和笔记使用同一函数；session-show 仅返回当前页的有效性映射。笔记保留原文，给旧练习标“已更正”、失效结论标“依据已失效”，结果字段标为历史结果/历史证据判断。该规则只处理显式引用，不替代对自然语言总结的核对。
+
 非 exercise 的 exercise_verified 结论必须关联已作答且批改、basis 为 exercise_verified 的练习。evidence 的 met 还需正确练习支持。用户自报的 met 不进入已验证能力。程序不能证明引用真实或结论语义正确，Agent 必须从实际会话整理，不能虚构或把讲解视为掌握。
 
 ## 检查点与精简交接
@@ -70,9 +72,11 @@ checkpoint / finish 输入三个字段：
 
 events 每批 0～100 条，handoff 每次必填。focus_ids 最多 20 个，引用现存有效事实。无练习、只有一个问题、未完成 Sprint 或没有学习事实都可结束，不得为填满笔记编造内容。
 
-context 默认只展开当前 Track 的 active 和最近一份 completed。返回交接、重点事实（text 最多 500 字符，截断带标记）、verified_abilities、unstable_points、unresolved_questions、understanding、omitted_event_count 与路径。仅覆盖选定交接，不是整个 Track 能力汇总；不足时 session-show 按 offset/limit 分页读取。正常读取不加载其他 Session 事实或其他 Goal/Track 历史；规划依赖检查沿用第一阶段规则。
+context 默认只展开当前 Track 的 active 和一份 completed。当前 active 尚无 handoff 且明确设置 previous_session_id 时，那份前序优先于完成时间；否则按完成时间选择。显式前序占用 limit 名额，去重后以 recent_order 表明顺序。返回交接、重点事实（text 最多 500 字符，截断带标记）、verified_abilities、unstable_points、unresolved_questions、understanding、omitted_event_count 与路径。仅覆盖选定交接，不是整个 Track 能力汇总；不足时 session-show 按 offset/limit 分页读取。正常读取不加载其他 Goal/Track 历史；规划依赖检查沿用第一阶段规则。
 
-索引保存定位摘要（ID、状态、主题、时间、请求键、关联 ID），以及记录文件大小/修改时间签名和索引内容摘要。失效时会在内存扫描本 Track 全部 Session 恢复定位，返回 rebuilt_in_memory；不将全部历史返回 AI，也不偷偷写文件。Python 校验仍读完整单份 JSON，每次 checkpoint 原子重写当前 Session，尚未做大文件分片。
+context/resume 的 continuation 为 `{source, source_session_id, handoff}`，source 为 current_session、previous_session、recent_session 或 none。恢复优先使用当前已保存的 handoff，否则仅读直接关联的前序，校验其为同范围且在当前 Session 开始前已结束。resume 的 reference_session 提供前序的精简事实；没有关联就不编造交接。当前 handoff 仍为 null、events 仍为空，引用历史不会算作本次学习。缺失或损坏前序时报错，不静默回退，也不递归加载前序链。
+
+索引保存定位摘要（ID、状态、主题、时间、请求键、关联 ID），以及记录文件大小/修改时间签名和索引内容摘要。结构与摘要合法时复用签名未变的条目，只读取并校验新增或变化的记录；索引缺失或损坏时全量重建。只读恢复仅在内存发生，返回 rebuilt_in_memory，不偷偷写文件。checkpoint/finish 的索引刷新使用同一增量路径；validate/repair 和 start 的前置校验仍全量读取权威记录。目录签名枚举、索引读写仍随 Session 数增长；Python 仍完整校验/重写单份 Session JSON，尚未分片。
 
 ## 提交与恢复
 
@@ -86,12 +90,15 @@ context 默认只展开当前 Track 的 active 和最近一份 completed。返�
 | 记录提交后 | 新事实已保存，重试原 operation_id 不重复追加 |
 | 笔记/索引失败 | context 从记录恢复；重试或 session-repair 补齐派生文件 |
 | 笔记冲突/人工修改 | 保留并报错，不自动覆盖；先备份核对 |
+| 修复前程序生成、缺少有效性标记的笔记 | validate 报需升级；仅显式 repair 且逐字节匹配原生成格式时原子更新派生笔记，record.json 不变 |
 | 权威 JSON 损坏、版本未知、摘要不一致 | 报错保留，人工从可信备份恢复；repair 不猜事实 |
 | 残留锁/暂存文件 | 确认没有写入者后人工检查，程序不抢锁或删除 |
 
 相同 operation_id、相同内容重试为无操作；同 ID 不同内容/操作报错。已完成记录的新 finish 请求仅在无新事实且 handoff 相同时按无操作处理，否则拒绝。去重以请求 ID 为边界，无法可靠识别不同 ID 下语义相同的自然语言事实。
 
 validate 全库只读检查结构、范围、历史摘要、引用、状态、笔记与索引，不自动迁移。mtime/size 和 SHA-256 用于事故检测和缓存一致性，不是防恶意篡改签名。网络盘、多机器并发、硬件断电持久性未验证。
+
+旧笔记兼容识别仅保留修复前确定性渲染格式，测试夹具来自提交 5669b1b 的实际模拟输出。读取和 finish 重试不自动升级；人工修改过的旧笔记仍按冲突拒绝。显式升级不新增学习事件，不改变检查点或生命周期。
 
 ## Phase 2B 接口
 

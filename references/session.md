@@ -5,7 +5,7 @@ Session 是用户本次选定的一段学习，主题可以偏离 Sprint，也�
 ## Agent 执行规则
 
 1. **开始学习**：读取 `session-context`（无当前位置先 `current` / `select`）。简述当前目标和建议，让用户选择主题；已有明确主题就采用。用户明确开始跟踪学习视为授权，调用 `session-start`，记录返回的稳定 ID。普通一次性答疑、不要求保存的普通聊天和明确拒绝记录时不调用写接口，只在对话内答疑。
-2. **继续上次学习**：新对话先读取精简上下文；`mode=resume` 表示尚未结束，用 `session-resume` 读取同一个 ID；`mode=new_session` 表示上一份已完成，参考交接后用新 request-id 调用 `session-start --from-session`。用户可以拒绝建议，学习其他内容。不重新打开已结束 Session，不把旧事实复制成新学习事件。
+2. **继续上次学习**：新对话先读取精简上下文；`mode=resume` 表示尚未结束，用 `session-resume` 读取同一个 ID，优先使用 `continuation.handoff` 并核对 `source_session_id`。当前 Session 还没有 checkpoint 且有 `previous_session_id` 时，程序读取那一份显式前序，不能用时间上较新的其他 Session 替代。已有当前交接则使用当前交接。`mode=new_session` 表示上一份已完成，参考交接后用新 request-id 调用 `session-start --from-session`。用户可以拒绝建议，学习其他内容；不重新打开已结束 Session，不把引用的旧事实复制成新学习事件。
 3. **学习过程**：根据真实提问、关键解释、练习及理解反馈整理批量 JSON。在重要概念告一段落、集中批改后、准备切换对话或用户要求时调用一次 `session-checkpoint`。无需逐题写多份文件。没有实际作答就不能记录正确答案或掌握结论；未做练习不是失败。
 4. **结束并保存**：收到“结束并记笔记”“今天就到这里，记录一下”“总结本次学习并保存”等指令，立即停止教学，不强制改错。将尚未落盘的真实事实、验收证据和交接整理为最后一个批次，调用 `session-finish`。如果之前只是未保存的聊天，先在已选 Goal/Track 下创建 Session，再仅保存本次明确授权范围；缺少范围时询问归属，不自行创建目标体系。用户已明确授权，不机械地再次确认。
 5. **反馈结果**：成功后给出短摘要、仍需关注的内容和实际保存路径。失败不声称成功，读取权威记录判断是否已提交后重试。Sprint 验收由 Agent 对照证据解释，保留自报与验证的区别；用户明确要求完成 Sprint 时另走 [planning.md](planning.md) 的 `transition`。
@@ -22,12 +22,14 @@ Session 是用户本次选定的一段学习，主题可以偏离 Sprint，也�
 | `session-checkpoint` | `--session`、`--data file.json` 或 `--data -`（stdin）；追加一批事实与交接 |
 | `session-finish` | 同上；原子完成记录，再生成唯一 `note.md` |
 | `session-resume` | `--session`；只读返回 active 会话，不产生重复学习事件 |
-| `session-context` | 默认最近 1 次 completed 和当前 active，`--limit 1..10`；不加载其他 Track 历史 |
+| `session-context` | 默认 1 份 completed 和当前 active；无当前交接时显式前序优先，其余按完成时间，`--limit 1..10` |
 | `session-list` | `--limit 1..100`，默认 5；按开始时间倒序返回摘要 |
-| `session-show` | `--session`、`--offset`、`--limit 1..100`；事实分页，按需核对原始记录 |
-| `session-repair` | 重建派生索引、补写缺失笔记；不改写权威事实，不覆盖冲突笔记 |
+| `session-show` | `--session`、`--offset`、`--limit 1..100`；事实分页及对应 event_validity，核对原始记录与当前有效性 |
+| `session-repair` | 全量校验并重建索引、补写缺失笔记或升级精确匹配旧生成格式的笔记；不改写权威事实或人工修改 |
 
 `session-context` 包含当前 Goal/Track、active Milestone/Sprint、是否允许学习、当前/最近 Session 的实际内容摘要、带 basis 的重点事实、已练习验证的验收证据、薄弱点、未解决问题、理解反馈、下一步建议及笔记路径。只返回 Agent 选择的最多 20 条重点事实，说明省略的事实数量；摘要不足时分页 `session-show` 或读取指定笔记。这是所选 Session 的交接，不是全领域能力评估或完整历史聚合。
+
+`continuation` 明确交接来源（current_session / previous_session / recent_session / none）、来源 ID 与交接文本。当前 Session 的原始 handoff 仍可为 null，不代表引用的前序内容已经在本次学过。引用前序时 context 的 `recent_order=explicit_predecessor_first`，该前序占用 limit 中的一份；resume 同时返回 `reference_session`，含其重点事实与笔记路径。只读取直接前序，不沿链展开；缺失或损坏时报错，不退回其他 Session。`session-list` 仍按开始时间倒序。
 
 ## 批量 JSON 合约
 
@@ -42,7 +44,7 @@ Session 是用户本次选定的一段学习，主题可以偏离 Sprint，也�
 
 `handoff.summary` 总结实际发生的学习；`next_step` 是建议，允许用户拒绝；`focus_ids` 选出续学所需的事实 ID。保留相关薄弱点和未解决问题，不因 AI 讲解过就从交接中删除。每次 checkpoint 更新交接，旧交接保留在检查点历史中。
 
-改正已存内容时追加新事实，用 `supersedes` 引用原事实，交接使用新 ID；原始事实不会删除。引用必须指向已经保存或本批较早出现的事实。不要对相同学习事件使用新 ID 重复追加。
+改正已存内容时追加新事实，用 `supersedes` 引用原事实，交接使用新 ID，并同步修正 summary/next_step 中已不成立的结论。原始事实不会删除。笔记将被替代事实标为“已更正”，把依赖失效事实的练习验证结论标为“依据已失效”，给出更正 ID；旧结果只作为历史原文展示。session-show 的 event_validity 同样给出 current/superseded/invalidated，不要单看旧事件的 correct/met 字段。引用必须指向已经保存或本批较早出现的事实。不要对相同学习事件使用新 ID 重复追加。
 
 `--request-id` 和 `operation_id` 使用稳定英文小写 slug，例如 `arraylist-start-1`。相同请求重试必须保持 ID 与内容一致；ID 相同而内容不同会报错。重复结束不再次生成学习事件或笔记。completed 会话需要补充新内容时，新开 Session 并引用旧记录。
 
@@ -82,6 +84,8 @@ python scripts/learning.py --hub ./planning-demo session-spec --goal java-backen
 python scripts/learning.py --hub ./planning-demo session-spec --goal java-backend --track spring-boot --topic "用户临时选择：配置文件基础" --minutes 30
 ```
 
-异常时先读 `session-context` / `session-show`：记录可能已原子提交，而笔记或索引尚未生成。重试原请求或运行 `session-repair`。缺失/过期索引在读取时仅内存重建，返回 `index_status=rebuilt_in_memory`；不会偷偷重写文件。`validate` 会要求补齐派生文件。损坏的权威 JSON、未知版本、笔记冲突、非法引用及残留暂存文件报错并保留。残留写锁须先确认没有写入进程，再备份人工处理；程序不会抢锁。
+异常时先读 `session-context` / `session-show`：记录可能已原子提交，而笔记或索引尚未生成。重试原请求或运行 `session-repair`。索引过期时复用签名未变的条目，仅重新校验变化记录；索引缺失或结构/摘要损坏时全量重建。只读时这些恢复仅在内存发生，返回 `index_status=rebuilt_in_memory`，不偷偷写文件。显式 validate/repair 始终全量读权威记录。损坏 JSON、未知版本、笔记冲突、非法引用及残留暂存文件报错并保留。残留写锁须确认无写入者后备份人工处理，程序不会抢锁。
+
+升级代码后，旧版生成的纠错笔记可能缺少有效性标记，validate 会报需升级。显式 session-repair 仅在文件逐字节等于原版程序从同一 record.json 生成的内容时更新该笔记；没有旧生成文件匹配证明时拒绝覆盖，包括添加过任何用户补充的文件。读取和 finish 重试不会偷偷升级旧笔记，权威 JSON 始终保持不变。
 
 程序只检查结构和引用关系，不能证明文字内容真实或用户真正掌握。使用 [Session 模板](../resources/templates/session.md) 检查笔记内容，不手工维护第二份状态表。本阶段不做自适应策略、自动画像、复习调度或知识共享。

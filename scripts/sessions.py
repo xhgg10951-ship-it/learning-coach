@@ -142,21 +142,46 @@ def check_event(event, previous, sprint):
             raise LearningError("已验证达标的证据必须关联正确的练习结果")
 
 
+def event_validity(events):
+    """Derive current validity without changing any historical fact.
+
+    related_ids precede their users, so dependency invalidation is a single
+    forward pass after collecting explicit corrections across the record.
+    """
+    replacements = {}
+    for identity, event in events.items():
+        for target in event.get("supersedes", []):
+            replacements.setdefault(target, []).append(identity)
+    validity = {}
+    for identity, event in events.items():
+        superseded_by = replacements.get(identity, [])
+        invalidated_by = [key for key in event.get("related_ids", [])
+                          if event["basis"] == "exercise_verified" and validity[key]["status"] != "current"]
+        corrections = set(superseded_by)
+        for key in invalidated_by:
+            corrections.update(validity[key]["correction_ids"])
+        validity[identity] = {
+            "status": "superseded" if superseded_by else "invalidated" if invalidated_by else "current",
+            "superseded_by": superseded_by, "invalidated_by": invalidated_by,
+            "correction_ids": sorted(corrections),
+        }
+    return validity
+
+
 def check_handoff(value, events):
     fields(value, {"summary", "next_step", "focus_ids"})
     text(value["summary"], "handoff.summary", 1200)
     text(value["next_step"], "handoff.next_step", 800)
     ids(value["focus_ids"], "focus_ids", 20)
-    superseded = {identity for item in events.values() for identity in item.get("supersedes", [])}
-    # Correcting an exercise also invalidates claims derived from that exercise.
-    for identity, event in events.items():
-        if event["basis"] == "exercise_verified" and any(key in superseded for key in event.get("related_ids", [])):
-            superseded.add(identity)
-    if any(identity not in events or identity in superseded for identity in value["focus_ids"]):
-        raise LearningError("handoff.focus_ids 必须引用现存且未被替代的事实")
+    validity = event_validity(events)
+    if any(identity not in events or validity[identity]["status"] != "current" for identity in value["focus_ids"]):
+        raise LearningError("handoff.focus_ids 必须引用现存、未被替代且依据有效的事实")
 
 
-def render_note(record):
+def render_note(record, *, annotate_validity=True):
+    # The unannotated form is only used to recognize exact, untouched output
+    # from 5669b1b during an explicit session-repair. New notes always annotate.
+    validity = event_validity({event["id"]: event for event in record["events"]})
     lines = [f"# {record['topic']}", "", f"Session: `{record['id']}`",
              f"Goal / Track: `{record['goal_id']}` / `{record['track_id']}`",
              f"Sprint: `{record['sprint_id'] or '未关联'}`",
@@ -169,11 +194,24 @@ def render_note(record):
         if not matching:
             lines += ["未记录。", ""]
         for event in matching:
-            lines += [f"### {event['id']} · {BASIS_LABELS[event['basis']]}", "", event["text"], ""]
+            status = validity[event["id"]]
+            historical = annotate_validity and status["status"] != "current"
+            basis = BASIS_LABELS[event["basis"]]
+            lines += [f"### {event['id']} · {f'历史记录（{basis}）' if historical else basis}", ""]
+            if historical:
+                status_label = "已更正" if status["status"] == "superseded" else "依据已失效"
+                lines += [f"**状态：{status_label}，不作为当前结论。**", "",
+                          f"更正记录：{', '.join(status['correction_ids'])}", ""]
+                if status["invalidated_by"]:
+                    lines += [f"失效依据：{', '.join(status['invalidated_by'])}", ""]
+                lines += ["历史原文：", ""]
+            lines += [event["text"], ""]
             for key, title in (("prompt", "题目"), ("answer", "用户答案"), ("result", "结果"),
                                ("feedback", "批改"), ("understanding", "用户反馈"),
                                ("criterion", "验收标准"), ("outcome", "证据判断")):
                 if key in event:
+                    if historical and key in {"result", "feedback", "understanding", "outcome"}:
+                        title = "历史" + title
                     lines += [f"{title}：{event[key] or '未作答'}", ""]
             for key, title in (("related_ids", "关联事实"), ("supersedes", "修订并替代（原文仍保留）")):
                 if event.get(key):
@@ -317,44 +355,79 @@ class SessionStore:
         return {key: record[key] for key in ("id", "status", "topic", "created_at", "updated_at", "completed_at",
                                              "sprint_id", "start_request_id", "previous_session_id")}
 
-    def catalog(self, goal, track, state, force=False):
-        signatures = self.signatures(goal, track)
-        path = self.directory(goal, track) / "index.json"
-        if path.exists() and not force:
-            try:
-                cached = _load(path)
-                if (cached.get("kind"), cached.get("goal_id"), cached.get("track_id")) == ("session_index", goal, track) and cached.get("signatures") == signatures and digest(cached.get("entries")) == cached.get("digest"):
-                    entries = cached["entries"]
-                    if isinstance(entries, list) and len(entries) == len(signatures) and {x["id"] for x in entries} == {x["id"] for x in signatures}:
-                        for item in entries:
-                            fields(item, {"id", "status", "topic", "created_at", "updated_at", "completed_at",
-                                          "sprint_id", "start_request_id", "previous_session_id"})
-                            session_id(item["id"])
-                            _id(item["start_request_id"], "request")
-                            text(item["topic"], "topic", 500)
-                            timestamp(item["created_at"])
-                            timestamp(item["updated_at"])
-                            if item["status"] not in ("active", "completed"):
-                                raise LearningError("索引状态错误")
-                            if item["status"] == "completed":
-                                timestamp(item["completed_at"])
-                        if (len({item["start_request_id"] for item in entries}) != len(entries) or
-                                sum(item["status"] == "active" for item in entries) > 1 or
-                                entries != sorted(entries, key=lambda item: (item["created_at"], item["id"]), reverse=True)):
-                            raise LearningError("索引顺序或唯一性错误")
-                        return entries, "current"
-            except (LearningError, KeyError, TypeError):
-                pass  # Derived data only. Preserve the file; reads rebuild in memory.
-        entries = [self.entry(self.load(goal, track, item["id"], state)) for item in signatures]
-        entries.sort(key=lambda item: (item["created_at"], item["id"]), reverse=True)
+    @staticmethod
+    def check_entries(entries):
+        if not isinstance(entries, list):
+            raise LearningError("Session 索引 entries 必须为数组")
+        for item in entries:
+            fields(item, {"id", "status", "topic", "created_at", "updated_at", "completed_at",
+                          "sprint_id", "start_request_id", "previous_session_id"})
+            session_id(item["id"])
+            _id(item["start_request_id"], "request")
+            text(item["topic"], "topic", 500)
+            if timestamp(item["updated_at"]) < timestamp(item["created_at"]):
+                raise LearningError("索引时间顺序错误")
+            if item["status"] not in ("active", "completed"):
+                raise LearningError("索引状态错误")
+            if item["status"] == "completed":
+                if timestamp(item["completed_at"]) != timestamp(item["updated_at"]):
+                    raise LearningError("索引完成时间错误")
+            elif item["completed_at"] is not None:
+                raise LearningError("active 索引不应有完成时间")
+            if item["sprint_id"] is not None:
+                _id(item["sprint_id"], "sprint")
+            if item["previous_session_id"] is not None:
+                session_id(item["previous_session_id"])
+        if len({item["id"] for item in entries}) != len(entries):
+            raise LearningError("Session 索引 ID 重复")
         if len({item["start_request_id"] for item in entries}) != len(entries):
             raise LearningError("Session start_request_id 重复")
         if sum(item["status"] == "active" for item in entries) > 1:
             raise LearningError("同一 Track 存在多个 active Session")
+        if entries != sorted(entries, key=lambda item: (item["created_at"], item["id"]), reverse=True):
+            raise LearningError("Session 索引顺序错误")
+
+    def cached_index(self, goal, track):
+        """Validate the cache's structure; freshness is checked per record below."""
+        path = self.directory(goal, track) / "index.json"
+        if path.exists():
+            try:
+                cached = _load(path)
+                if ((cached.get("kind"), cached.get("goal_id"), cached.get("track_id")) != ("session_index", goal, track)
+                        or digest(cached.get("entries")) != cached.get("digest")):
+                    raise LearningError("Session 索引范围或摘要错误")
+                self.check_entries(cached["entries"])
+                signatures = cached["signatures"]
+                if not isinstance(signatures, list) or len(signatures) != len(cached["entries"]):
+                    raise LearningError("Session 索引签名数量错误")
+                for signature in signatures:
+                    fields(signature, {"id", "size", "mtime_ns"})
+                    session_id(signature["id"])
+                    if any(type(signature[key]) is not int or signature[key] < 0 for key in ("size", "mtime_ns")):
+                        raise LearningError("Session 索引签名无效")
+                if {item["id"] for item in signatures} != {item["id"] for item in cached["entries"]}:
+                    raise LearningError("Session 索引签名与记录不匹配")
+                return cached
+            except (LearningError, KeyError, TypeError):
+                pass  # Derived data only. Preserve the file; reads rebuild in memory.
+        return None
+
+    def catalog(self, goal, track, state, force=False):
+        signatures = self.signatures(goal, track)
+        path = self.directory(goal, track) / "index.json"
+        cached = None if force else self.cached_index(goal, track)
+        if cached and cached["signatures"] == signatures:
+            return cached["entries"], "current"
+        prior_signatures = {item["id"]: item for item in cached["signatures"]} if cached else {}
+        prior_entries = {item["id"]: item for item in cached["entries"]} if cached else {}
+        entries = [prior_entries[item["id"]] if prior_signatures.get(item["id"]) == item else
+                   self.entry(self.load(goal, track, item["id"], state)) for item in signatures]
+        entries.sort(key=lambda item: (item["created_at"], item["id"]), reverse=True)
+        self.check_entries(entries)
         return entries, "rebuilt_in_memory" if signatures or path.exists() else "empty"
 
-    def write_index(self, goal, track, state):
-        entries, _ = self.catalog(goal, track, state, force=True)
+    def write_index(self, goal, track, state, *, force=False):
+        entries, _ = self.catalog(goal, track, state, force=force)
         value = {"schema_version": 2, "kind": "session_index", "goal_id": goal, "track_id": track,
                  "signatures": self.signatures(goal, track), "entries": entries, "digest": digest(entries)}
         path = self.directory(goal, track) / "index.json"
@@ -366,7 +439,7 @@ class SessionStore:
                 pass
         _save(path, value)
 
-    def materialize(self, record):
+    def materialize(self, record, *, upgrade_notes=False):
         path = self.path(record["goal_id"], record["track_id"], record["id"], "note.md")
         if record["status"] != "completed":
             if path.exists():
@@ -374,7 +447,13 @@ class SessionStore:
             return
         expected = render_note(record)
         if path.exists():
-            if path.read_bytes() != expected.encode("utf-8"):
+            actual = path.read_bytes()
+            if actual != expected.encode("utf-8"):
+                if actual == render_note(record, annotate_validity=False).encode("utf-8"):
+                    if upgrade_notes:
+                        _atomic(path, expected)
+                        return
+                    raise LearningError(f"旧版笔记缺少事实有效性标记: {path}；运行 session-repair 显式升级派生笔记")
                 raise LearningError(f"笔记与权威记录冲突: {path}；保留文件，不覆盖人工修改")
         else:
             _atomic(path, expected)
@@ -479,10 +558,13 @@ class SessionStore:
 
     def compact(self, record):
         events = {event["id"]: event for event in record["events"]}
+        validity = event_validity(events)
         handoff = record["handoff"]
         focus = []
         if handoff:
             for identity in handoff["focus_ids"]:
+                if validity[identity]["status"] != "current":
+                    continue
                 event = events[identity]
                 focus.append({"id": identity, "kind": event["kind"], "basis": event["basis"],
                               "text": event["text"][:500], "detail_truncated": len(event["text"]) > 500,
@@ -497,6 +579,18 @@ class SessionStore:
                 "understanding": [item for item in focus if item["kind"] == "understanding"],
                 "omitted_event_count": len(events) - len(focus)}
 
+    def continuation(self, record, state):
+        """Resolve at most one explicitly selected predecessor, without copying facts."""
+        source, reference = record, None
+        source_kind = "current_session" if record["handoff"] is not None else "none"
+        if record["handoff"] is None and record["previous_session_id"] is not None:
+            reference = self.load(record["goal_id"], record["track_id"], record["previous_session_id"], state)
+            if reference["status"] != "completed" or timestamp(reference["completed_at"]) > timestamp(record["created_at"]):
+                raise LearningError("显式前序 Session 必须已结束且早于当前 Session；不回退到其他记录")
+            source, source_kind = reference, "previous_session"
+        return {"source": source_kind, "source_session_id": source["id"] if source_kind != "none" else None,
+                "handoff": source["handoff"]}, reference
+
     def context(self, goal=None, track=None, limit=1):
         self.limit(limit, 10)
         goal, track, state = self.scope(goal, track)
@@ -504,14 +598,29 @@ class SessionStore:
         active = next((item for item in entries if item["status"] == "active"), None)
         recent = sorted((item for item in entries if item["status"] == "completed"),
                         key=lambda item: (item["completed_at"], item["id"]), reverse=True)[:limit]
+        active_record = self.load(goal, track, active["id"], state) if active else None
+        continuation, reference = ({"source": "none", "source_session_id": None, "handoff": None}, None)
+        if active_record:
+            continuation, reference = self.continuation(active_record, state)
+        if reference:
+            # Explicit --from-session wins over chronological recency until the
+            # new Session has its own checkpoint. Still honor the output limit.
+            recent = [self.entry(reference)] + [item for item in recent if item["id"] != reference["id"]]
+        recent_records = [reference if reference and item["id"] == reference["id"] else
+                          self.load(goal, track, item["id"], state) for item in recent[:limit]]
+        if active_record is None and recent_records:
+            source = recent_records[0]
+            continuation = {"source": "recent_session", "source_session_id": source["id"], "handoff": source["handoff"]}
         parent = self.hub.get_goal(goal)
         return {"goal": self.hub._summary(parent), "track": self.hub._summary(state),
                 "current_milestone": next((item for item in state["milestones"].values() if item["status"] == "active"), None),
                 "current_sprint": next((item for item in state["sprints"].values() if item["status"] == "active"), None),
                 "learning_allowed": parent["status"] == state["status"] == "active",
                 "mode": "resume" if active else "new_session" if recent else "start",
-                "active_session": self.compact(self.load(goal, track, active["id"], state)) if active else None,
-                "recent_sessions": [self.compact(self.load(goal, track, item["id"], state)) for item in recent],
+                "active_session": self.compact(active_record) if active_record else None,
+                "recent_sessions": [self.compact(record) for record in recent_records],
+                "continuation": continuation,
+                "recent_order": "explicit_predecessor_first" if reference else "completed_at_desc",
                 "index_status": cache, "history_scope": "selected_track_only", "recent_limit": limit}
 
     def resume(self, goal, track, identity):
@@ -520,7 +629,9 @@ class SessionStore:
         if record["status"] != "active":
             raise LearningError("已结束 Session 不能恢复；请 session-start --from-session 新建")
         self.hub._parents_active(goal, state)
-        return {"mode": "resume", "session": self.compact(record)}
+        continuation, reference = self.continuation(record, state)
+        return {"mode": "resume", "session": self.compact(record), "continuation": continuation,
+                "reference_session": self.compact(reference) if reference else None}
 
     def listing(self, goal=None, track=None, limit=5):
         self.limit(limit)
@@ -536,8 +647,10 @@ class SessionStore:
         goal, track, state = self.scope(goal, track)
         record = self.load(goal, track, identity, state)
         end = offset + limit
+        validity = event_validity({event["id"]: event for event in record["events"]})
         return {**self.compact(record), "sprint_snapshot": record["sprint_snapshot"],
                 "events": record["events"][offset:end], "offset": offset,
+                "event_validity": {event["id"]: validity[event["id"]] for event in record["events"][offset:end]},
                 "next_offset": end if end < len(record["events"]) else None}
 
     def validate_track(self, goal, track, repair=False):
@@ -550,17 +663,17 @@ class SessionStore:
             if previous is not None and (previous not in by_id or by_id[previous]["status"] != "completed" or timestamp(by_id[previous]["completed_at"]) > timestamp(record["created_at"])):
                 raise LearningError("previous_session_id 缺失、未结束或时间关系错误")
             if repair:
-                self.materialize(record)
+                self.materialize(record, upgrade_notes=True)
             else:
                 note = self.path(goal, track, entry["id"], "note.md")
                 if record["status"] == "completed":
                     if not note.exists() or note.read_bytes() != render_note(record).encode("utf-8"):
-                        raise LearningError(f"笔记缺失或冲突: {note}；运行 session-repair，仅补写缺失派生文件")
+                        raise LearningError(f"笔记缺失、需升级有效性标记或冲突: {note}；运行 session-repair，仅补写缺失或精确匹配旧格式的派生笔记")
                 elif note.exists():
                     raise LearningError(f"active Session 不应存在笔记: {note}")
         if entries or (self.directory(goal, track) / "index.json").exists():
             if repair:
-                self.write_index(goal, track, state)
+                self.write_index(goal, track, state, force=True)
             else:
                 cached, status = self.catalog(goal, track, state)
                 if status != "current" or cached != entries:

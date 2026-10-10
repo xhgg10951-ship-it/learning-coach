@@ -1,5 +1,7 @@
 # Phase 2A：Session 持久化与跨对话续学交付
 
+> 下文保留 2026-10-09 初次交付记录。2026-10-10 的独立审查核对、三项修复及新增回归见 [审查修复记录](phase2a-review-fixes.md)；当前行为以 [Session 协议](session-schema.md) 为准。
+
 日期：2026-10-09。基准：`refactor/phase1-learning-structure` / `10e6b0a`。开发分支：`feature/phase2a-session-persistence`。本次在原仓库开发，没有重建仓库、读取或修改正式 Hub。所有测试和结构校验均使用独立临时目录。
 
 ## 实际修改文件
