@@ -1,0 +1,17 @@
+{
+  "command": "python -B -m unittest discover -s tests -v",
+  "tests": 160,
+  "baseline_tests": 137,
+  "new_teaching_tests": 23,
+  "seconds": 555.476,
+  "result": "OK",
+  "log_sha256": "ecb6b6afd40333ea48728844b30510c21992ba3479e7f01aefebeaae1a5c7e3f",
+  "student_data": "temporary synthetic hubs; no production hub access",
+  "source_sha256": {
+    "scripts\\learning.py": "c4f3994a2550856eb8862c7a60bdc4c7f3835a56d1fa38a4cb94e76bbb628c3e",
+    "scripts\\progress.py": "dbdc27e3d161a87be774b5962a32d86f47e0f35b9157487010432b3558d154cd",
+    "scripts\\sessions.py": "3123a811e30f6b1b256cf88cf485d886b31a7cbc11252b08efd4fe493460a1b1",
+    "scripts\\teaching.py": "68e7c0f4cdbf10efd8227f133ad4bd08f9739949b76f2855e8ead9b8e805b976",
+    "tests\\test_teaching.py": "36a65907410a0c047485523aa90229817f6ba4a7d46cbd8c451481cf1beb1ec8"
+  }
+}

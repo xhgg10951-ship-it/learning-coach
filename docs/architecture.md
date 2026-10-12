@@ -1,4 +1,4 @@
-# Learning Coach 架构（Phase 1 + Phase 2A）
+# Learning Coach 架构（Phase 1 + Phase 2A + Phase 2B）
 
 ## 范围与旧设计处置
 
@@ -10,7 +10,7 @@
 | 权威资料查找、范围与版本核验 | 保留；按当前 Track 逐步读取与细化 |
 | 月目标、ISO 周、复选框状态、自动顺延 | 新版使用非日历的 Milestone/Sprint，状态改由 Python 校验的 JSON 保存 |
 | 全局大纲与单文件计划 | 拆为多个独立 Goal/Track，初始化仅保留粗粒度地图 |
-| 学习热身、练习批改、结束后笔记与画像更新 | Phase 2A 保存实际练习与批改、生成笔记及交接；不实现教学调度或自动画像 |
+| 学习热身、练习批改、结束后笔记与画像更新 | Phase 2A 保存实际事实、生成笔记及交接；Phase 2B 根据证据自适应教学，不自动更新画像 |
 | 旧进度脚本与 HTML | 保留只读兼容入口；新版和旧版明确区分，移除日历推进及掌握率推断 |
 | 旧模板与已有数据 | 旧模板原样保存到 `resources/templates/legacy/`；不修改已有用户数据 |
 
@@ -110,6 +110,8 @@ learning-hub/
 
 Phase 2A 中，Agent 从实际会话整理带来源摘录的内容、问题、解释、练习、薄弱点、理解反馈和验收证据，Python 批量校验并持久化。交接区分用户自报、AI 判断、练习验证和未验证，不能把已讲解当成已掌握。收到明确结束保存指令立即停止教学并保存，无须再次机械确认。
 
+Phase 2B 的 Agent 在教学前读取 teaching-context，结合用户选择调整模式、起点和实践形式。Python 校验并保存教学调整、练习形式、错误类型、分项批改，投影逐项能力证据；不按时长或题数计算掌握，不生成练习或自动改变 Sprint 状态。见 [教学合约](teaching-schema.md) 和 [教学流程](../references/teaching.md)。
+
 Session 记录采用单文件原子提交，笔记与索引是可重建投影。新对话读取 session-context，只展开相关少量记录；active 无自身交接时优先读取显式前序，completed 只作为参考，不复制学习事件。笔记与交接共享事实有效性判断，纠错后旧结论保留并标明失效。正常索引刷新复用签名未变条目，validate/repair 仍全量读取；旧版生成笔记仅在显式 repair 且精确匹配旧格式时升级，人工修改保留。具体协议见 [session-schema.md](session-schema.md)。
 
 Agent 理解目标、复用画像、提出领域结构，生成当前能力目标和验收标准，核验资料，根据已有结果建议下一步并让用户确认重要规划。已授权的具体方案无需再次确认。自由切换、暂停、跳过等用户明确指令直接落实。
@@ -132,6 +134,7 @@ CLI 位于 `scripts/learning.py`；全局 `--hub` 位于子命令之前：
 | `session-start`、`session-checkpoint`、`session-finish` | 稳定 ID、批量事实、重要检查点和结束笔记 |
 | `session-correct` | 在原 completed Session 追加更正、撤回失效证据并更新派生笔记，不重新打开学习 |
 | `session-context`、`session-resume` | 精简交接、恢复 active；completed 只作为新 Session 的参考 |
+| `teaching-context` | 画像、相关真实练习、教学模式/难度与当前 Sprint 逐项证据；只读 |
 | `session-list`、`session-show`、`session-repair` | 历史摘要与事实分页、派生文件恢复 |
 
 真实可运行示例见 [onboarding](../references/onboarding.md)、[planning](../references/planning.md) 和 [progress](../references/progress.md)。各命令的完整参数以 `python scripts/learning.py <子命令> --help` 为准。
@@ -165,7 +168,7 @@ CLI 位于 `scripts/learning.py`；全局 `--hub` 位于子命令之前：
 
 修改清单、实际测试结果与限制见 [Phase 2A 交付记录](phase2a-delivery.md)。
 
-本阶段不实现自适应教学、练习调度、自动画像、共享知识库、跨 Goal 掌握同步、复习调度、FSRS、向量数据库/RAG、Web 前端或多 Agent 系统。knowledge_ids/review_candidates 只预留字段。Agent 记录真实事实，Python 校验结构、引用和写入，程序不生成不存在的学习事实。
+Phase 2B 实现证据驱动的自适应教学与综合实践；不实现自动画像、共享知识库、跨 Goal 掌握同步、自动复习调度、FSRS、向量数据库/RAG、Web 前端或运行时多 Agent 系统。knowledge_ids/review_candidates 只预留字段。真实 Agent 对话测试属于开发验收工具，不是产品中的 Agent 编排功能。Agent 记录真实事实，Python 校验结构、引用和写入，程序不生成不存在的学习事实。
 
 JSON 能校验结构与状态，不能判定学习者是否真正掌握；验收说明的质量由用户与 Agent 负责。多文件创建不是完整事务，异常恢复需备份和人工核对。旧数据需要人工解释，不能自动得到可信的新能力结论。没有强制资料联网依赖，无法核验时必须如实标注；联网资料的版本变化不自动改写已完成历史。
 

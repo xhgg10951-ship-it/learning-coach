@@ -1,0 +1,34 @@
+[
+  {
+    "scenario": "arraylist",
+    "completed_actual_turns": 11,
+    "structural_pass": true,
+    "exported_hub_valid": true,
+    "student_data": "synthetic",
+    "behavior_review": "See phase2b-delivery.md; structural checks alone do not establish teaching quality."
+  },
+  {
+    "scenario": "mysql",
+    "completed_actual_turns": 1,
+    "structural_pass": true,
+    "exported_hub_valid": true,
+    "student_data": "synthetic",
+    "behavior_review": "See phase2b-delivery.md; structural checks alone do not establish teaching quality."
+  },
+  {
+    "scenario": "english",
+    "completed_actual_turns": 1,
+    "structural_pass": true,
+    "exported_hub_valid": true,
+    "student_data": "synthetic",
+    "behavior_review": "See phase2b-delivery.md; structural checks alone do not establish teaching quality."
+  },
+  {
+    "scenario": "theory",
+    "completed_actual_turns": 1,
+    "structural_pass": true,
+    "exported_hub_valid": true,
+    "student_data": "synthetic",
+    "behavior_review": "See phase2b-delivery.md; structural checks alone do not establish teaching quality."
+  }
+]

@@ -1,0 +1,40 @@
+[
+  {
+    "turn": 1,
+    "fresh": false,
+    "user": "开始学习并记录。我会 SELECT 和 JOIN，今天用 Practice 模式。请给一个订单统计的综合实战，包含 SQL 编写和执行计划分析，提供必要的表结构和样本执行计划。",
+    "assistant": "直接用 **Practice 模式**做一个综合实战：**月度付费客户排行榜**。你已说明会 SELECT 和 JOIN，我们从实际统计需求开始。\n\n**任务一：写 SQL**\n\n统计 **2026 年 10 月**已支付订单，输出客户 ID、客户名、支付订单数、支付总额、最后支付订单的创建时间。要求：\n\n- 只统计 `status = 'PAID'`，以 `created_at` 判断所属月份。\n- 只保留当月支付订单数至少 2 笔、支付总额至少 100 元的客户。\n- 按支付总额降序、客户 ID 升序排列，取前 10 名。\n- 金额是订单总额；本题不考虑退款。时间均为同一业务时区。\n\n下面的结构和数据可用于 MySQL 8.0 / InnoDB 练习，请在练习数据库中运行：\n\n```sql\nCREATE TABLE customers (\n    customer_id BIGINT PRIMARY KEY,\n    customer_name VARCHAR(50) NOT NULL\n) ENGINE=InnoDB;\n\nCREATE TABLE orders (\n    order_id BIGINT PRIMARY KEY,\n    customer_id BIGINT NOT NULL,\n    created_at DATETIME NOT NULL,\n    status VARCHAR(12) NOT NULL,\n    amount DECIMAL(10,2) NOT NULL,\n    KEY idx_customer (customer_id)\n) ENGINE=InnoDB;\n\nINSERT INTO customers VALUES\n(1, '林一'), (2, '陈二'), (3, '王三'),\n(4, '李四'), (5, '周五');\n\nINSERT INTO orders VALUES\n(101, 1, '2026-09-30 23:59:59', 'PAID',      900.00),\n(102, 1, '2026-10-01 00:00:00', 'PAID',      120.00),\n(103, 1, '2026-10-10 12:00:00', 'PAID',       80.00),\n(104, 1, '2026-10-12 12:00:00', 'CANCELLED', 600.00),\n(105, 2, '2026-10-02 10:00:00', 'PAID',      300.00),\n(106, 2, '2026-10-20 10:00:00', 'PAID',      250.00),\n(107, 3, '2026-10-05 10:00:00', 'PAID',     1000.00),\n(108, 4, '2026-10-03 10:00:00', 'PAID',       50.00),\n(109, 4, '2026-10-31 23:59:59', 'PAID',       50.00),\n(110, 2, '2026-11-01 00:00:00', 'PAID',     9000.00);\n```\n\n提交一条完整 SQL，并简述日期边界、明细过滤和分组过滤如何处理。留意：样本包含月界、取消订单、单笔大额订单，以及两笔小额订单合计达标的情况。\n\n**任务二：分析执行计划**\n\n以下是**人工编写的教学模拟摘要，没有实际执行**。假设订单表有 200 万行，A、B 针对同一条满足上述需求的 SQL；每行的数值是优化器估算，不能当作真实耗时。它们也不是上面 10 行数据的运行结果。\n\n方案 A 只有建表时的索引：\n\n| table | type | key | rows | filtered | Extra |\n|---|---|---|---:|---:|---|\n| o | ALL | NULL | 2000000 | 1.50 | Using where; Using temporary; Using filesort |\n| c | eq_ref | PRIMARY | 1 | 100.00 | — |\n\n方案 B 假设增加了这个候选索引：\n\n```sql\nCREATE INDEX idx_status_time_cover\nON orders (status, created_at, customer_id, amount);\n```\n\n| table | type | key | rows | filtered | Extra |\n|---|---|---|---:|---:|---|\n| o | range | idx_status_time_cover | 30000 | 100.00 | Using where; Using index; Using temporary; Using filesort |\n| c | eq_ref | PRIMARY | 1 | 100.00 | — |\n\n围绕这两份计划，给出你的判断：\n\n1. `o` 从 `ALL` 变为 `range` 表示什么？`c` 的 `eq_ref` 与表结构有什么关系？\n2. 分别用 `rows × filtered / 100` 估算订单表过滤后留下的行数。为什么留下的数量相近，访问成本仍可能不同？\n3. 候选索引为什么这样排列？结合本题查询说明后两列的作用，以及 `Using index` 的含义。\n4. B 仍有 `Using temporary; Using filesort`，能否据此判定索引无效？又能否仅凭这两份计划确定 B 的实际耗时更短？说明理由和还需要的证据。\n\n**提交方式：**先发你的 SQL，再给 A/B 分析。若手边有数据库，可额外附上自己运行的 `EXPLAIN`；小样本可能出现不同计划，如实贴出即可，不必强行复现模拟结果。\n\n这组将观察“写出分组统计 SQL”和“根据 EXPLAIN 分析索引选择”两项能力；目前还没有你的作答，均未验证。\n\n已保存本轮任务、Practice 偏好及你对 SELECT/JOIN 基础的自报；[学习记录](E:/learning-coach/.test-tmp/phase2b-native-final/mysql/workspace/hub/goals/demo/tracks/core/sessions/SE-0b1ee2c78f9a40adb77e4ef12bc3470d/record.json)保持 **active**，等待你的作答。",
+    "engine": "native-independent-agent",
+    "source_agent": "/root/final_mysql",
+    "completion_observed": true,
+    "checks": {
+      "session": {
+        "expected": "active",
+        "actual": "active",
+        "pass": true
+      },
+      "mode": {
+        "expected": "practice",
+        "actual": "practice",
+        "pass": true
+      },
+      "valid": {
+        "pass": true
+      }
+    },
+    "runtime_sha256": {
+      "SKILL.md": "ae6944401342c885720615d142c394a435b13ddfb32a362cd7aea980c212e30e",
+      "scripts\\learning.py": "c4f3994a2550856eb8862c7a60bdc4c7f3835a56d1fa38a4cb94e76bbb628c3e",
+      "scripts\\progress.py": "dbdc27e3d161a87be774b5962a32d86f47e0f35b9157487010432b3558d154cd",
+      "scripts\\sessions.py": "3123a811e30f6b1b256cf88cf485d886b31a7cbc11252b08efd4fe493460a1b1",
+      "scripts\\teaching.py": "68e7c0f4cdbf10efd8227f133ad4bd08f9739949b76f2855e8ead9b8e805b976",
+      "references\\onboarding.md": "8fb1d405afc41392b7d90ac720c431b88b82ab8da82043cc0b6a673a9b8cdcd0",
+      "references\\planning.md": "9ecd2ad7da49143efe46086f225d69085a836131f79a158428444716c82cf5a2",
+      "references\\progress.md": "32bf6f0fc5851591c838bdeaeea34bd157b9dfb98a938cdbca6002a0c2b0e193",
+      "references\\session.md": "e81b731b153d9ededfecdce64cc8af5b80c648fdf9da4b163d361538ea1bfe3d",
+      "references\\syllabus.md": "19dc39e5ac836f7ab90466e48323357301ac2186e43e77f8b9ffb803b836ea8d",
+      "references\\teaching.md": "a1440be9542734eab321a0708d2f43b8d7dd99a70a3abcc47453db977d35ff8a"
+    },
+    "structural_pass": true
+  }
+]

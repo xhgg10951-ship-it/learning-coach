@@ -2,11 +2,13 @@
 
 Session 是用户本次选定的一段学习，主题可以偏离 Sprint，也可以不关联 Sprint。日期只是元数据，不驱动进度；结束 Session 不等于完成 Sprint。
 
+涉及实际教学、练习或节奏调整时同时读取 [teaching.md](teaching.md)；开始时用 teaching-context 读取画像、原始练习及每条验收标准的证据。批改与教学状态的增量字段见 [教学数据合约](../docs/teaching-schema.md)，保存继续用本文件的批次流程。
+
 ## Agent 执行规则
 
 1. **开始学习**：读取 `session-context`（无当前位置先 `current` / `select`）。简述当前目标和建议，让用户选择主题；已有明确主题就采用。用户明确开始跟踪学习视为授权，调用 `session-start`，记录返回的稳定 ID。普通一次性答疑、不要求保存的普通聊天和明确拒绝记录时不调用写接口，只在对话内答疑。
 2. **继续上次学习**：新对话先读取精简上下文；`mode=resume` 表示尚未结束，用 `session-resume` 读取同一个 ID，优先使用 `continuation.handoff` 并核对 `source_session_id`。当前 Session 还没有 checkpoint 且有 `previous_session_id` 时，程序读取那一份显式前序，不能用时间上较新的其他 Session 替代。已有当前交接则使用当前交接。`mode=new_session` 表示上一份已完成，参考交接后用新 request-id 调用 `session-start --from-session`。用户可以拒绝建议，学习其他内容；不重新打开已结束 Session，不把引用的旧事实复制成新学习事件。
-3. **学习过程**：根据真实提问、关键解释、练习及理解反馈整理批量 JSON。在重要概念告一段落、集中批改后、准备切换对话或用户要求时调用一次 `session-checkpoint`。无需逐题写多份文件。没有实际作答就不能记录正确答案或掌握结论；未做练习不是失败。
+3. **学习过程**：根据真实提问、关键解释、练习及理解反馈整理批量 JSON。在重要概念告一段落、集中批改后、准备切换对话或用户要求时调用一次 `session-checkpoint`。“本组练习到这里，保存结果”也属于检查点，保持 active；只有用户明确结束本次学习并保存才使用 finish。无需逐题写多份文件。没有实际作答就不能记录正确答案或掌握结论；未做练习不是失败。
 4. **结束并保存**：收到“结束并记笔记”“今天就到这里，记录一下”“总结本次学习并保存”等指令，立即停止教学，不强制改错。将尚未落盘的真实事实、验收证据和交接整理为最后一个批次，调用 `session-finish`。如果之前只是未保存的聊天，先在已选 Goal/Track 下创建 Session，再仅保存本次明确授权范围；缺少范围时询问归属，不自行创建目标体系。用户已明确授权，不机械地再次确认。
 5. **反馈结果**：成功后给出短摘要、仍需关注的内容和实际保存路径。失败不声称成功，读取权威记录判断是否已提交后重试。Sprint 验收由 Agent 对照证据解释，保留自报与验证的区别；用户明确要求完成 Sprint 时另走 [planning.md](planning.md) 的 `transition`。
 6. **结束后纠错**：用户要求更正已保存事实或批改时，先用 session-show 核对原 Session 与事实 ID，再用 session-correct 追加更正、reason 和修正后的 handoff。用户已明确授权就直接执行。新会话的普通解释不能撤回旧会话证据；同一事实的纠错落到原 Session，新的学习仍新建 Session。更正不重开学习、不改变原完成时间、不自动改变 Sprint 状态。
@@ -85,7 +87,7 @@ python scripts/learning.py --hub ./session-demo session-list --limit 1 --offset 
 
 ## 兼容与故障处理
 
-规划 schema v2 不变。新 Session 和普通保存继续使用 session_version=1；首次显式 session-correct 将该记录升为 session_version=2，保存 finish 之后的 correction 检查点。当前程序兼容读写两版，旧程序会拒绝版本 2；读取、重试 finish 和 repair 不升级记录。第一阶段空 sessions/ 无须迁移，读取不会创建索引。旧版 Goal 级笔记原样只读，通过 progress.py 查看，不能自动解释为新版验收结果。
+规划 schema v2 不变。新 Session 和普通保存继续使用 session_version=1；首次显式 session-correct 将该记录升为 session_version=2，保存 finish 之后的 correction 检查点。保存 Phase 2B 教学字段才升为版本 3，详见 [教学数据合约](../docs/teaching-schema.md)。当前程序兼容读写三版；读取、重试 finish 和 repair 不升级记录。第一阶段空 sessions/ 无须迁移，读取不会创建索引。旧版 Goal 级笔记原样只读，通过 progress.py 查看，不能自动解释为新版验收结果。
 
 兼容 `session-spec` 仍只返回临时结构，不负责真正开始学习。以下示例沿用 [planning.md](planning.md) 的数据：
 
@@ -100,4 +102,4 @@ python scripts/learning.py --hub ./planning-demo session-spec --goal java-backen
 
 结束后更正已提交而笔记尚未更新时，重试或 repair 会用保留的检查点还原旧生成内容；逐字节匹配才替换。若人工修改过笔记则报错保留，应先备份核对。损坏记录返回带文件路径的 JSON error，退出码 2；程序不会猜测缺失事实或调整顺序。更正仅在原 Session 内生效，不自动改写其他 Session 的摘要或规划验收；引用该记录时应重新读取。
 
-程序只检查结构和引用关系，不能证明文字内容真实或用户真正掌握。使用 [Session 模板](../resources/templates/session.md) 检查笔记内容，不手工维护第二份状态表。本阶段不做自适应策略、自动画像、复习调度或知识共享。
+程序只检查结构和引用关系，不能证明文字内容真实或用户真正掌握。使用 [Session 模板](../resources/templates/session.md) 检查笔记内容，不手工维护第二份状态表。自适应策略由 [教学流程](teaching.md) 使用有效证据执行；不做自动画像、复习调度或知识共享。

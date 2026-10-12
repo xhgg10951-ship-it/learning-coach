@@ -1,0 +1,382 @@
+{
+  "type": "observed_pre_fix_regression",
+  "student_data": "synthetic",
+  "teacher": "actual independent Agent output",
+  "verdict": "failed",
+  "reason": "The student explicitly defined k as the number of tail elements; the Agent reused the earlier problem definition of insertion position and under-credited an equivalent analysis.",
+  "observed_turn": {
+    "turn": 3,
+    "fresh": false,
+    "user": "修正：get(2) 的索引等于 size，先越界，应为 IndexOutOfBoundsException；get(1) 本身得到 null，调用 length() 才空指针。复制 m 个元素要 O(m)；向中间插入这 m 个元素还需移动尾部 k 个元素，所以 O(m+k)，最坏 O(m+n)。这组到这里，请保存本组结果并说明还有哪些能力没验证。",
+    "assistant": "这次更正里，**异常边界判断正确**：`get(2)` 因索引等于 `size` 而抛 `IndexOutOfBoundsException`；`get(1)` 返回 `null`，对它调用 `length()` 才抛 `NullPointerException`。你也正确修正了复制 m 个元素的成本为 **O(m)**，以及插入最坏可达 **O(n+m)**。\n\n复杂度表达还差一个符号：原题把 **k 定义为插入位置**，原有 n 个元素中需要后移的是位置 k 到 n−1 的 **n−k 个元素**，所以容量足够时是 O(m+n−k)。如果把 k 另定义为“尾部元素数”，O(m+k) 才成立。需要扩容时，还要计入复制原有元素的 O(n)；总量级仍可写成 O(n+m)。\n\n**本组结果已保存**，Session 保持进行中。已经有独立作答证据的是 size 与容量、扩容与均摊复杂度，以及这次更正后的索引越界和空指针区分。批量复制成本的核心判断已修正，但按插入位置计算尾部搬移、区分扩容情形，以及与逐个 `add` 的成本比较，尚未完整验证。原任务的批量插入实现、各失败场景和实际运行输出也还没有提交，因此“独立实现并运行综合案例”仍未验证。按你的要求，这组就到这里。",
+    "engine": "native-independent-agent",
+    "source_agent": "/root/arraylist_economical",
+    "completion_observed": true,
+    "checks": {
+      "verified": {
+        "expected": [
+          "区分索引越界与空指针异常",
+          "分析批量复制和插入复杂度"
+        ],
+        "actual": [
+          "区分索引越界与空指针异常"
+        ],
+        "pass": false
+      },
+      "session": {
+        "expected": "active",
+        "actual": "active",
+        "pass": true
+      },
+      "valid": {
+        "pass": true
+      }
+    },
+    "runtime_sha256": {
+      "SKILL.md": "ae6944401342c885720615d142c394a435b13ddfb32a362cd7aea980c212e30e",
+      "scripts\\learning.py": "c4f3994a2550856eb8862c7a60bdc4c7f3835a56d1fa38a4cb94e76bbb628c3e",
+      "scripts\\progress.py": "dbdc27e3d161a87be774b5962a32d86f47e0f35b9157487010432b3558d154cd",
+      "scripts\\sessions.py": "3123a811e30f6b1b256cf88cf485d886b31a7cbc11252b08efd4fe493460a1b1",
+      "scripts\\teaching.py": "68e7c0f4cdbf10efd8227f133ad4bd08f9739949b76f2855e8ead9b8e805b976",
+      "references\\onboarding.md": "8fb1d405afc41392b7d90ac720c431b88b82ab8da82043cc0b6a673a9b8cdcd0",
+      "references\\planning.md": "9ecd2ad7da49143efe46086f225d69085a836131f79a158428444716c82cf5a2",
+      "references\\progress.md": "32bf6f0fc5851591c838bdeaeea34bd157b9dfb98a938cdbca6002a0c2b0e193",
+      "references\\session.md": "e81b731b153d9ededfecdce64cc8af5b80c648fdf9da4b163d361538ea1bfe3d",
+      "references\\syllabus.md": "19dc39e5ac836f7ab90466e48323357301ac2186e43e77f8b9ffb803b836ea8d",
+      "references\\teaching.md": "a1440be9542734eab321a0708d2f43b8d7dd99a70a3abcc47453db977d35ff8a"
+    },
+    "structural_pass": false
+  },
+  "criteria": [
+    {
+      "criterion": "解释 ArrayList 基本操作、size 和容量",
+      "status": "verified",
+      "decisive_evidence": {
+        "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+        "event_id": "turn-02-code-answer",
+        "at": "2026-10-11T08:56:07.252109+00:00",
+        "basis": "exercise_verified",
+        "text": "合成学生提供自己的 ArrayList 代码及边界、复制复杂度判断；按代码推理分项批改，未当作运行验证。",
+        "sources": [
+          {
+            "ref": "agent-turn-02.json#/user",
+            "quote": "我用自己的代码作答，你按这个批改：var xs = new ArrayList<String>(10); xs.add(\"a\"); xs.add(null);。size 是 2，容量至少 10。xs.get(2) 会抛 NullPointerException；xs.get(1).length() 也会抛 NullPointerException。我觉得 System.arraycopy 复制 m 个元素是 O(1)，因为只调用一次方法。"
+          }
+        ],
+        "outcome": "met",
+        "observed_at": "2026-10-11T08:56:07.252109+00:00",
+        "reason": "自写代码加入字符串和 null 后正确判断 size=2、容量至少为指定初始容量10。",
+        "related_ids": [
+          "turn-01-order-batch-task"
+        ]
+      },
+      "evidence": [
+        {
+          "session_id": "SE-326164266244415192a36fb56a6717b5",
+          "event_id": "prior-evidence-0",
+          "at": "2026-10-11T08:49:33.845965+00:00",
+          "basis": "exercise_verified",
+          "text": "解释 ArrayList 基本操作、size 和容量",
+          "sources": [
+            {
+              "ref": "synthetic-fixture/user/2",
+              "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+            }
+          ],
+          "outcome": "met",
+          "observed_at": "2026-10-11T08:49:33.845965+00:00",
+          "reason": "解释 ArrayList 基本操作、size 和容量",
+          "related_ids": [
+            "prior-correct-0"
+          ]
+        },
+        {
+          "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+          "event_id": "turn-02-code-answer",
+          "at": "2026-10-11T08:56:07.252109+00:00",
+          "basis": "exercise_verified",
+          "text": "合成学生提供自己的 ArrayList 代码及边界、复制复杂度判断；按代码推理分项批改，未当作运行验证。",
+          "sources": [
+            {
+              "ref": "agent-turn-02.json#/user",
+              "quote": "我用自己的代码作答，你按这个批改：var xs = new ArrayList<String>(10); xs.add(\"a\"); xs.add(null);。size 是 2，容量至少 10。xs.get(2) 会抛 NullPointerException；xs.get(1).length() 也会抛 NullPointerException。我觉得 System.arraycopy 复制 m 个元素是 O(1)，因为只调用一次方法。"
+            }
+          ],
+          "outcome": "met",
+          "observed_at": "2026-10-11T08:56:07.252109+00:00",
+          "reason": "自写代码加入字符串和 null 后正确判断 size=2、容量至少为指定初始容量10。",
+          "related_ids": [
+            "turn-01-order-batch-task"
+          ]
+        }
+      ]
+    },
+    {
+      "criterion": "解释扩容和均摊复杂度",
+      "status": "verified",
+      "decisive_evidence": {
+        "session_id": "SE-326164266244415192a36fb56a6717b5",
+        "event_id": "prior-evidence-1",
+        "at": "2026-10-11T08:49:33.845965+00:00",
+        "basis": "exercise_verified",
+        "text": "解释扩容和均摊复杂度",
+        "sources": [
+          {
+            "ref": "synthetic-fixture/user/3",
+            "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+          }
+        ],
+        "outcome": "met",
+        "observed_at": "2026-10-11T08:49:33.845965+00:00",
+        "reason": "解释扩容和均摊复杂度",
+        "related_ids": [
+          "prior-correct-1"
+        ]
+      },
+      "evidence": [
+        {
+          "session_id": "SE-326164266244415192a36fb56a6717b5",
+          "event_id": "prior-evidence-1",
+          "at": "2026-10-11T08:49:33.845965+00:00",
+          "basis": "exercise_verified",
+          "text": "解释扩容和均摊复杂度",
+          "sources": [
+            {
+              "ref": "synthetic-fixture/user/3",
+              "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+            }
+          ],
+          "outcome": "met",
+          "observed_at": "2026-10-11T08:49:33.845965+00:00",
+          "reason": "解释扩容和均摊复杂度",
+          "related_ids": [
+            "prior-correct-1"
+          ]
+        }
+      ]
+    },
+    {
+      "criterion": "区分索引越界与空指针异常",
+      "status": "verified",
+      "decisive_evidence": {
+        "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+        "event_id": "turn-03-correction-answer",
+        "at": "2026-10-11T14:43:42.050047+00:00",
+        "basis": "exercise_verified",
+        "text": "合成学生更正索引异常和批量复制成本；索引与 null 解引用区分正确，复制 m 个元素 O(m) 和最坏 O(n+m) 正确，但将原题的插入位置 k 误用为尾部元素数。未提交代码运行结果。",
+        "sources": [
+          {
+            "ref": "agent-turn-03.json#/user",
+            "quote": "修正：get(2) 的索引等于 size，先越界，应为 IndexOutOfBoundsException；get(1) 本身得到 null，调用 length() 才空指针。复制 m 个元素要 O(m)；向中间插入这 m 个元素还需移动尾部 k 个元素，所以 O(m+k)，最坏 O(m+n)。这组到这里，请保存本组结果并说明还有哪些能力没验证。"
+          }
+        ],
+        "outcome": "met",
+        "observed_at": "2026-10-11T14:43:42.050047+00:00",
+        "reason": "准确区分 get(2) 的索引越界与 get(1) 返回 null 后调用 length() 的空指针异常。",
+        "related_ids": [
+          "turn-02-code-answer"
+        ]
+      },
+      "evidence": [
+        {
+          "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+          "event_id": "turn-01-order-batch-task",
+          "at": "2026-10-11T08:52:57.159234+00:00",
+          "basis": "unverified",
+          "text": "布置紧急订单批次插入待发货队列的综合任务，包含独立异常场景、批量插入实现与运行、复制和插入复杂度分析；尚未收到本轮答案。",
+          "sources": [
+            {
+              "ref": "agent-turn-01.json#/assistant",
+              "quote": "**综合任务：把紧急订单批次插入待发货队列。**\n\n使用 `java.util.*`，准备下面的数据：\n\n```java\nstatic ArrayList<String> seed() {\n    ArrayList<String> orders = new ArrayList<>(8);\n    orders.addAll(Arrays.asList(\"A01\", null, \"A03\", \"A04\"));\n    return orders;\n}\n\nList<String> batch = Arrays.asList(\"B01\", \"B02\", \"B03\");\n```\n\n**1. 排查边界。** 每个场景都重新执行 `orders = seed()`，先预测再运行。记录返回值或具体异常类、列表是否改变，以及原因；一个场景的异常不能中断其他场景。\n\n| 场景 | 单独执行的语句 |\n|---|---|\n| A | `orders.get(orders.size())` |\n| B | `orders.get(1)` |\n| C | `orders.get(1).length()` |\n| D | `orders.addAll(orders.size(), batch)` |\n| E | `orders.addAll(orders.size() + 1, batch)` |\n| F | `orders.addAll(2, null)` |\n\n**2. 实现批量插入。** 补全这个方法：\n\n```java\nstatic void insertBatch(\n        ArrayList<String> orders, int index, List<String> batch) {\n    // 由你实现\n}\n```\n\n要求：`orders` 非 null；允许在 `0..size` 插入，保持原队列与批次各自的顺序，不修改来源批次；允许 null 元素。非法索引抛出 `IndexOutOfBoundsException`，null 批次抛出 `NullPointerException`，这些失败场景不能改变原队列。\n\n用 `seed()` 在位置 2 插入给定批次，再覆盖头部、尾部、空批次、负索引、超过 size 的索引和 null 批次；每次重置数据，每个失败用例只设置一个非法条件。输出插入后的列表和来源批次。\n\n**3. 解释成本。** 设原元素数为 n、批次元素数为 m、插入位置为 k。分别讨论容量足够和需要扩容时，批次复制、尾部搬移、扩容带来的成本；再与依次执行 `add(k + i, batch.get(i))` 比较（比较时假设 batch 的 get 为 O(1)）。说明“一次方法调用”能否代表 O(1)，并联系本例在位置 2 插入的情况。\n\n把**实现代码、运行输出和复杂度分析**一起发来。这一题将分别检查异常判断、批量复制成本和独立实现；收到实际作答后再逐项判断。"
+            }
+          ],
+          "outcome": "unverified",
+          "observed_at": "2026-10-11T08:52:57.159234+00:00",
+          "reason": "尚无本轮场景判断或运行结果。",
+          "related_ids": []
+        },
+        {
+          "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+          "event_id": "turn-02-code-answer",
+          "at": "2026-10-11T08:56:07.252109+00:00",
+          "basis": "exercise_verified",
+          "text": "合成学生提供自己的 ArrayList 代码及边界、复制复杂度判断；按代码推理分项批改，未当作运行验证。",
+          "sources": [
+            {
+              "ref": "agent-turn-02.json#/user",
+              "quote": "我用自己的代码作答，你按这个批改：var xs = new ArrayList<String>(10); xs.add(\"a\"); xs.add(null);。size 是 2，容量至少 10。xs.get(2) 会抛 NullPointerException；xs.get(1).length() 也会抛 NullPointerException。我觉得 System.arraycopy 复制 m 个元素是 O(1)，因为只调用一次方法。"
+            }
+          ],
+          "outcome": "partial",
+          "observed_at": "2026-10-11T08:56:07.252109+00:00",
+          "reason": "正确判断 get(1).length() 的空指针异常，但将越界的 get(2) 错判为空指针异常。",
+          "related_ids": [
+            "turn-01-order-batch-task"
+          ]
+        },
+        {
+          "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+          "event_id": "turn-03-correction-answer",
+          "at": "2026-10-11T14:43:42.050047+00:00",
+          "basis": "exercise_verified",
+          "text": "合成学生更正索引异常和批量复制成本；索引与 null 解引用区分正确，复制 m 个元素 O(m) 和最坏 O(n+m) 正确，但将原题的插入位置 k 误用为尾部元素数。未提交代码运行结果。",
+          "sources": [
+            {
+              "ref": "agent-turn-03.json#/user",
+              "quote": "修正：get(2) 的索引等于 size，先越界，应为 IndexOutOfBoundsException；get(1) 本身得到 null，调用 length() 才空指针。复制 m 个元素要 O(m)；向中间插入这 m 个元素还需移动尾部 k 个元素，所以 O(m+k)，最坏 O(m+n)。这组到这里，请保存本组结果并说明还有哪些能力没验证。"
+            }
+          ],
+          "outcome": "met",
+          "observed_at": "2026-10-11T14:43:42.050047+00:00",
+          "reason": "准确区分 get(2) 的索引越界与 get(1) 返回 null 后调用 length() 的空指针异常。",
+          "related_ids": [
+            "turn-02-code-answer"
+          ]
+        }
+      ]
+    },
+    {
+      "criterion": "分析批量复制和插入复杂度",
+      "status": "needs_consolidation",
+      "decisive_evidence": {
+        "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+        "event_id": "turn-03-correction-answer",
+        "at": "2026-10-11T14:43:42.050047+00:00",
+        "basis": "exercise_verified",
+        "text": "合成学生更正索引异常和批量复制成本；索引与 null 解引用区分正确，复制 m 个元素 O(m) 和最坏 O(n+m) 正确，但将原题的插入位置 k 误用为尾部元素数。未提交代码运行结果。",
+        "sources": [
+          {
+            "ref": "agent-turn-03.json#/user",
+            "quote": "修正：get(2) 的索引等于 size，先越界，应为 IndexOutOfBoundsException；get(1) 本身得到 null，调用 length() 才空指针。复制 m 个元素要 O(m)；向中间插入这 m 个元素还需移动尾部 k 个元素，所以 O(m+k)，最坏 O(m+n)。这组到这里，请保存本组结果并说明还有哪些能力没验证。"
+          }
+        ],
+        "outcome": "partial",
+        "observed_at": "2026-10-11T14:43:42.050047+00:00",
+        "reason": "复制 O(m) 和最坏 O(n+m) 正确，但原题 k 是插入位置，尾部元素数应为 n-k；未分析扩容情形与逐个 add 的比较。",
+        "related_ids": [
+          "turn-02-code-answer"
+        ]
+      },
+      "evidence": [
+        {
+          "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+          "event_id": "turn-01-order-batch-task",
+          "at": "2026-10-11T08:52:57.159234+00:00",
+          "basis": "unverified",
+          "text": "布置紧急订单批次插入待发货队列的综合任务，包含独立异常场景、批量插入实现与运行、复制和插入复杂度分析；尚未收到本轮答案。",
+          "sources": [
+            {
+              "ref": "agent-turn-01.json#/assistant",
+              "quote": "**综合任务：把紧急订单批次插入待发货队列。**\n\n使用 `java.util.*`，准备下面的数据：\n\n```java\nstatic ArrayList<String> seed() {\n    ArrayList<String> orders = new ArrayList<>(8);\n    orders.addAll(Arrays.asList(\"A01\", null, \"A03\", \"A04\"));\n    return orders;\n}\n\nList<String> batch = Arrays.asList(\"B01\", \"B02\", \"B03\");\n```\n\n**1. 排查边界。** 每个场景都重新执行 `orders = seed()`，先预测再运行。记录返回值或具体异常类、列表是否改变，以及原因；一个场景的异常不能中断其他场景。\n\n| 场景 | 单独执行的语句 |\n|---|---|\n| A | `orders.get(orders.size())` |\n| B | `orders.get(1)` |\n| C | `orders.get(1).length()` |\n| D | `orders.addAll(orders.size(), batch)` |\n| E | `orders.addAll(orders.size() + 1, batch)` |\n| F | `orders.addAll(2, null)` |\n\n**2. 实现批量插入。** 补全这个方法：\n\n```java\nstatic void insertBatch(\n        ArrayList<String> orders, int index, List<String> batch) {\n    // 由你实现\n}\n```\n\n要求：`orders` 非 null；允许在 `0..size` 插入，保持原队列与批次各自的顺序，不修改来源批次；允许 null 元素。非法索引抛出 `IndexOutOfBoundsException`，null 批次抛出 `NullPointerException`，这些失败场景不能改变原队列。\n\n用 `seed()` 在位置 2 插入给定批次，再覆盖头部、尾部、空批次、负索引、超过 size 的索引和 null 批次；每次重置数据，每个失败用例只设置一个非法条件。输出插入后的列表和来源批次。\n\n**3. 解释成本。** 设原元素数为 n、批次元素数为 m、插入位置为 k。分别讨论容量足够和需要扩容时，批次复制、尾部搬移、扩容带来的成本；再与依次执行 `add(k + i, batch.get(i))` 比较（比较时假设 batch 的 get 为 O(1)）。说明“一次方法调用”能否代表 O(1)，并联系本例在位置 2 插入的情况。\n\n把**实现代码、运行输出和复杂度分析**一起发来。这一题将分别检查异常判断、批量复制成本和独立实现；收到实际作答后再逐项判断。"
+            }
+          ],
+          "outcome": "unverified",
+          "observed_at": "2026-10-11T08:52:57.159234+00:00",
+          "reason": "尚无本轮成本分析。",
+          "related_ids": []
+        },
+        {
+          "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+          "event_id": "turn-02-code-answer",
+          "at": "2026-10-11T08:56:07.252109+00:00",
+          "basis": "exercise_verified",
+          "text": "合成学生提供自己的 ArrayList 代码及边界、复制复杂度判断；按代码推理分项批改，未当作运行验证。",
+          "sources": [
+            {
+              "ref": "agent-turn-02.json#/user",
+              "quote": "我用自己的代码作答，你按这个批改：var xs = new ArrayList<String>(10); xs.add(\"a\"); xs.add(null);。size 是 2，容量至少 10。xs.get(2) 会抛 NullPointerException；xs.get(1).length() 也会抛 NullPointerException。我觉得 System.arraycopy 复制 m 个元素是 O(1)，因为只调用一次方法。"
+            }
+          ],
+          "outcome": "not_met",
+          "observed_at": "2026-10-11T08:56:07.252109+00:00",
+          "reason": "以只调用一次方法为由把复制 m 个元素错判为 O(1)；本轮尚未提交插入成本分析。",
+          "related_ids": [
+            "turn-01-order-batch-task"
+          ]
+        },
+        {
+          "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+          "event_id": "turn-03-correction-answer",
+          "at": "2026-10-11T14:43:42.050047+00:00",
+          "basis": "exercise_verified",
+          "text": "合成学生更正索引异常和批量复制成本；索引与 null 解引用区分正确，复制 m 个元素 O(m) 和最坏 O(n+m) 正确，但将原题的插入位置 k 误用为尾部元素数。未提交代码运行结果。",
+          "sources": [
+            {
+              "ref": "agent-turn-03.json#/user",
+              "quote": "修正：get(2) 的索引等于 size，先越界，应为 IndexOutOfBoundsException；get(1) 本身得到 null，调用 length() 才空指针。复制 m 个元素要 O(m)；向中间插入这 m 个元素还需移动尾部 k 个元素，所以 O(m+k)，最坏 O(m+n)。这组到这里，请保存本组结果并说明还有哪些能力没验证。"
+            }
+          ],
+          "outcome": "partial",
+          "observed_at": "2026-10-11T14:43:42.050047+00:00",
+          "reason": "复制 O(m) 和最坏 O(n+m) 正确，但原题 k 是插入位置，尾部元素数应为 n-k；未分析扩容情形与逐个 add 的比较。",
+          "related_ids": [
+            "turn-02-code-answer"
+          ]
+        }
+      ]
+    },
+    {
+      "criterion": "独立实现并运行综合案例",
+      "status": "unverified",
+      "decisive_evidence": null,
+      "evidence": [
+        {
+          "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+          "event_id": "turn-01-order-batch-task",
+          "at": "2026-10-11T08:52:57.159234+00:00",
+          "basis": "unverified",
+          "text": "布置紧急订单批次插入待发货队列的综合任务，包含独立异常场景、批量插入实现与运行、复制和插入复杂度分析；尚未收到本轮答案。",
+          "sources": [
+            {
+              "ref": "agent-turn-01.json#/assistant",
+              "quote": "**综合任务：把紧急订单批次插入待发货队列。**\n\n使用 `java.util.*`，准备下面的数据：\n\n```java\nstatic ArrayList<String> seed() {\n    ArrayList<String> orders = new ArrayList<>(8);\n    orders.addAll(Arrays.asList(\"A01\", null, \"A03\", \"A04\"));\n    return orders;\n}\n\nList<String> batch = Arrays.asList(\"B01\", \"B02\", \"B03\");\n```\n\n**1. 排查边界。** 每个场景都重新执行 `orders = seed()`，先预测再运行。记录返回值或具体异常类、列表是否改变，以及原因；一个场景的异常不能中断其他场景。\n\n| 场景 | 单独执行的语句 |\n|---|---|\n| A | `orders.get(orders.size())` |\n| B | `orders.get(1)` |\n| C | `orders.get(1).length()` |\n| D | `orders.addAll(orders.size(), batch)` |\n| E | `orders.addAll(orders.size() + 1, batch)` |\n| F | `orders.addAll(2, null)` |\n\n**2. 实现批量插入。** 补全这个方法：\n\n```java\nstatic void insertBatch(\n        ArrayList<String> orders, int index, List<String> batch) {\n    // 由你实现\n}\n```\n\n要求：`orders` 非 null；允许在 `0..size` 插入，保持原队列与批次各自的顺序，不修改来源批次；允许 null 元素。非法索引抛出 `IndexOutOfBoundsException`，null 批次抛出 `NullPointerException`，这些失败场景不能改变原队列。\n\n用 `seed()` 在位置 2 插入给定批次，再覆盖头部、尾部、空批次、负索引、超过 size 的索引和 null 批次；每次重置数据，每个失败用例只设置一个非法条件。输出插入后的列表和来源批次。\n\n**3. 解释成本。** 设原元素数为 n、批次元素数为 m、插入位置为 k。分别讨论容量足够和需要扩容时，批次复制、尾部搬移、扩容带来的成本；再与依次执行 `add(k + i, batch.get(i))` 比较（比较时假设 batch 的 get 为 O(1)）。说明“一次方法调用”能否代表 O(1)，并联系本例在位置 2 插入的情况。\n\n把**实现代码、运行输出和复杂度分析**一起发来。这一题将分别检查异常判断、批量复制成本和独立实现；收到实际作答后再逐项判断。"
+            }
+          ],
+          "outcome": "unverified",
+          "observed_at": "2026-10-11T08:52:57.159234+00:00",
+          "reason": "尚无学生实现或运行输出。",
+          "related_ids": []
+        },
+        {
+          "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+          "event_id": "turn-02-code-answer",
+          "at": "2026-10-11T08:56:07.252109+00:00",
+          "basis": "exercise_verified",
+          "text": "合成学生提供自己的 ArrayList 代码及边界、复制复杂度判断；按代码推理分项批改，未当作运行验证。",
+          "sources": [
+            {
+              "ref": "agent-turn-02.json#/user",
+              "quote": "我用自己的代码作答，你按这个批改：var xs = new ArrayList<String>(10); xs.add(\"a\"); xs.add(null);。size 是 2，容量至少 10。xs.get(2) 会抛 NullPointerException；xs.get(1).length() 也会抛 NullPointerException。我觉得 System.arraycopy 复制 m 个元素是 O(1)，因为只调用一次方法。"
+            }
+          ],
+          "outcome": "unverified",
+          "observed_at": "2026-10-11T08:56:07.252109+00:00",
+          "reason": "提交了简短代码和判断，未提交批量插入实现或实际运行输出。",
+          "related_ids": [
+            "turn-01-order-batch-task"
+          ]
+        },
+        {
+          "session_id": "SE-fb417dfa11764499baa8e8632585a625",
+          "event_id": "turn-03-correction-answer",
+          "at": "2026-10-11T14:43:42.050047+00:00",
+          "basis": "exercise_verified",
+          "text": "合成学生更正索引异常和批量复制成本；索引与 null 解引用区分正确，复制 m 个元素 O(m) 和最坏 O(n+m) 正确，但将原题的插入位置 k 误用为尾部元素数。未提交代码运行结果。",
+          "sources": [
+            {
+              "ref": "agent-turn-03.json#/user",
+              "quote": "修正：get(2) 的索引等于 size，先越界，应为 IndexOutOfBoundsException；get(1) 本身得到 null，调用 length() 才空指针。复制 m 个元素要 O(m)；向中间插入这 m 个元素还需移动尾部 k 个元素，所以 O(m+k)，最坏 O(m+n)。这组到这里，请保存本组结果并说明还有哪些能力没验证。"
+            }
+          ],
+          "outcome": "unverified",
+          "observed_at": "2026-10-11T14:43:42.050047+00:00",
+          "reason": "仍无批量插入实现、覆盖场景与运行输出。",
+          "related_ids": [
+            "turn-02-code-answer"
+          ]
+        }
+      ]
+    }
+  ],
+  "fix": "Judge the explicitly stated variable definitions and equivalent derivations; retain separately unverified optional extensions."
+}

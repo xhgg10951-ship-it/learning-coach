@@ -1,0 +1,117 @@
+[
+  {
+    "turn": 1,
+    "fresh": false,
+    "user": "继续学习 ArrayList，记录到当前 Sprint。我已经会基本操作和扩容。今天从实际案例开始，先给我一个覆盖异常边界和批量复制的综合任务。",
+    "assistant": "已有记录支持你的基本操作和扩容基础，本轮直接按 **Practice** 进入实际案例。\n\n**综合任务：把紧急订单批次插入待发货队列。**\n\n使用 `java.util.*`，准备下面的数据：\n\n```java\nstatic ArrayList<String> seed() {\n    ArrayList<String> orders = new ArrayList<>(8);\n    orders.addAll(Arrays.asList(\"A01\", null, \"A03\", \"A04\"));\n    return orders;\n}\n\nList<String> batch = Arrays.asList(\"B01\", \"B02\", \"B03\");\n```\n\n**1. 排查边界。** 每个场景都重新执行 `orders = seed()`，先预测再运行。记录返回值或具体异常类、列表是否改变，以及原因；一个场景的异常不能中断其他场景。\n\n| 场景 | 单独执行的语句 |\n|---|---|\n| A | `orders.get(orders.size())` |\n| B | `orders.get(1)` |\n| C | `orders.get(1).length()` |\n| D | `orders.addAll(orders.size(), batch)` |\n| E | `orders.addAll(orders.size() + 1, batch)` |\n| F | `orders.addAll(2, null)` |\n\n**2. 实现批量插入。** 补全这个方法：\n\n```java\nstatic void insertBatch(\n        ArrayList<String> orders, int index, List<String> batch) {\n    // 由你实现\n}\n```\n\n要求：`orders` 非 null；允许在 `0..size` 插入，保持原队列与批次各自的顺序，不修改来源批次；允许 null 元素。非法索引抛出 `IndexOutOfBoundsException`，null 批次抛出 `NullPointerException`，这些失败场景不能改变原队列。\n\n用 `seed()` 在位置 2 插入给定批次，再覆盖头部、尾部、空批次、负索引、超过 size 的索引和 null 批次；每次重置数据，每个失败用例只设置一个非法条件。输出插入后的列表和来源批次。\n\n**3. 解释成本。** 设原元素数为 n、批次元素数为 m、插入位置为 k。分别讨论容量足够和需要扩容时，批次复制、尾部搬移、扩容带来的成本；再与依次执行 `add(k + i, batch.get(i))` 比较（比较时假设 batch 的 get 为 O(1)）。说明“一次方法调用”能否代表 O(1)，并联系本例在位置 2 插入的情况。\n\n把**实现代码、运行输出和复杂度分析**一起发来。这一题将分别检查异常判断、批量复制成本和独立实现；收到实际作答后再逐项判断。\n\n已保存本轮学习要求、Practice 设置和待作答任务，关联当前 Sprint `SP001`。Session `SE-fb417dfa11764499baa8e8632585a625` 保持 active；本轮尚未作答，未新增掌握结论。[查看学习记录](E:/learning-coach/.test-tmp/phase2b-native-final/arraylist/workspace/hub/goals/demo/tracks/core/sessions/SE-fb417dfa11764499baa8e8632585a625/record.json)",
+    "engine": "native-independent-agent",
+    "source_agent": "/root/final_arraylist",
+    "completion_observed": true,
+    "checks": {
+      "session": {
+        "expected": "active",
+        "actual": "active",
+        "pass": true
+      },
+      "valid": {
+        "pass": true
+      }
+    },
+    "runtime_sha256": {
+      "SKILL.md": "ae6944401342c885720615d142c394a435b13ddfb32a362cd7aea980c212e30e",
+      "scripts\\learning.py": "c4f3994a2550856eb8862c7a60bdc4c7f3835a56d1fa38a4cb94e76bbb628c3e",
+      "scripts\\progress.py": "dbdc27e3d161a87be774b5962a32d86f47e0f35b9157487010432b3558d154cd",
+      "scripts\\sessions.py": "3123a811e30f6b1b256cf88cf485d886b31a7cbc11252b08efd4fe493460a1b1",
+      "scripts\\teaching.py": "68e7c0f4cdbf10efd8227f133ad4bd08f9739949b76f2855e8ead9b8e805b976",
+      "references\\onboarding.md": "8fb1d405afc41392b7d90ac720c431b88b82ab8da82043cc0b6a673a9b8cdcd0",
+      "references\\planning.md": "9ecd2ad7da49143efe46086f225d69085a836131f79a158428444716c82cf5a2",
+      "references\\progress.md": "32bf6f0fc5851591c838bdeaeea34bd157b9dfb98a938cdbca6002a0c2b0e193",
+      "references\\session.md": "e81b731b153d9ededfecdce64cc8af5b80c648fdf9da4b163d361538ea1bfe3d",
+      "references\\syllabus.md": "19dc39e5ac836f7ab90466e48323357301ac2186e43e77f8b9ffb803b836ea8d",
+      "references\\teaching.md": "a1440be9542734eab321a0708d2f43b8d7dd99a70a3abcc47453db977d35ff8a"
+    },
+    "structural_pass": true
+  },
+  {
+    "turn": 2,
+    "fresh": false,
+    "user": "我用自己的代码作答，你按这个批改：var xs = new ArrayList<String>(10); xs.add(\"a\"); xs.add(null);。size 是 2，容量至少 10。xs.get(2) 会抛 NullPointerException；xs.get(1).length() 也会抛 NullPointerException。我觉得 System.arraycopy 复制 m 个元素是 O(1)，因为只调用一次方法。",
+    "assistant": "这份作答**部分正确**：size、容量和第二个异常判断正确；需要修正的是 `get(2)` 的异常类型和复制复杂度。\n\n| 你的判断 | 批改 |\n|---|---|\n| size 是 2，容量至少 10 | 正确。加入的 null 也占一个元素位置。 |\n| `xs.get(2)` 抛空指针异常 | 应为 **IndexOutOfBoundsException**。当前可读取的索引只有 0、1。 |\n| `xs.get(1).length()` 抛空指针异常 | 正确。`get(1)` 返回 null，随后调用 `length()` 才触发 **NullPointerException**。 |\n| 复制 m 个元素是 O(1) | 应为 **O(m)**，工作量随复制的元素数增长。 |\n\n可以把容量看成仓库预留的位置，而 size 表示已经登记的元素数：预留了 10 个位置，也不能读取尚未登记的索引 2。索引 1 已登记，只是里面存的是 null；读取它本身没有问题，继续对 null 调用方法才出错。\n\n“一次方法调用”只是代码表面上的次数。好比只打一次搬家电话，搬 10 箱和搬 1000 箱的工作量仍然不同。`System.arraycopy` 的底层优化可以降低复制开销，但在通常的复杂度分析中，成功复制 m 个固定大小的元素仍按 O(m) 计算。\n\n本轮保留你对 size、容量和 null 元素访问的正确判断；**索引边界和批量复制成本仍需巩固**。目前没有你提交的运行输出，批量插入的实现也尚未验证。这次讲解本身不会记为你已掌握。",
+    "engine": "native-independent-agent",
+    "source_agent": "/root/arraylist_economical",
+    "completion_observed": true,
+    "checks": {
+      "gaps": {
+        "expected": [
+          "区分索引越界与空指针异常",
+          "分析批量复制和插入复杂度"
+        ],
+        "actual": [
+          "区分索引越界与空指针异常",
+          "分析批量复制和插入复杂度"
+        ],
+        "pass": true
+      },
+      "valid": {
+        "pass": true
+      }
+    },
+    "runtime_sha256": {
+      "SKILL.md": "ae6944401342c885720615d142c394a435b13ddfb32a362cd7aea980c212e30e",
+      "scripts\\learning.py": "c4f3994a2550856eb8862c7a60bdc4c7f3835a56d1fa38a4cb94e76bbb628c3e",
+      "scripts\\progress.py": "dbdc27e3d161a87be774b5962a32d86f47e0f35b9157487010432b3558d154cd",
+      "scripts\\sessions.py": "3123a811e30f6b1b256cf88cf485d886b31a7cbc11252b08efd4fe493460a1b1",
+      "scripts\\teaching.py": "68e7c0f4cdbf10efd8227f133ad4bd08f9739949b76f2855e8ead9b8e805b976",
+      "references\\onboarding.md": "8fb1d405afc41392b7d90ac720c431b88b82ab8da82043cc0b6a673a9b8cdcd0",
+      "references\\planning.md": "9ecd2ad7da49143efe46086f225d69085a836131f79a158428444716c82cf5a2",
+      "references\\progress.md": "32bf6f0fc5851591c838bdeaeea34bd157b9dfb98a938cdbca6002a0c2b0e193",
+      "references\\session.md": "e81b731b153d9ededfecdce64cc8af5b80c648fdf9da4b163d361538ea1bfe3d",
+      "references\\syllabus.md": "19dc39e5ac836f7ab90466e48323357301ac2186e43e77f8b9ffb803b836ea8d",
+      "references\\teaching.md": "a1440be9542734eab321a0708d2f43b8d7dd99a70a3abcc47453db977d35ff8a"
+    },
+    "structural_pass": true
+  },
+  {
+    "turn": 3,
+    "fresh": false,
+    "user": "修正：get(2) 的索引等于 size，先越界，应为 IndexOutOfBoundsException；get(1) 本身得到 null，调用 length() 才空指针。复制 m 个元素要 O(m)；向中间插入这 m 个元素还需移动尾部 k 个元素，所以 O(m+k)，最坏 O(m+n)。这组到这里，请保存本组结果并说明还有哪些能力没验证。",
+    "assistant": "这次修正中，异常判断正确：`get(2)` 因索引等于 `size` 抛 `IndexOutOfBoundsException`；`get(1)` 返回 `null`，随后调用 `length()` 才抛 `NullPointerException`。复制 m 个元素是 O(m)，插入最坏为 O(n+m)，这些判断也正确。\n\n有一处符号需要对齐：原题用 k 表示**插入位置**，所以原有 n 个元素中，需要后移的是 n−k 个；容量足够时为 O(m+n−k)。如果你把 k 重新定义为“尾部元素数”，O(m+k) 也成立。\n\n本组结果已保存到当前 Sprint `SP001` 的 Session `SE-fb417dfa11764499baa8e8632585a625`，它仍是 active。本组已验证你能区分这两类异常，以及能判断复制 O(m) 和插入最坏 O(n+m)。尚未验证的是：按原题的 k 定义准确计算尾部搬移量、分别分析扩容情形并与逐个 `add` 比较，以及独立实现批量插入、覆盖边界场景并提供实际运行结果。此前的 size/容量和扩容均摊复杂度已有验证记录；这组到这里，不继续出题。",
+    "engine": "native-independent-agent",
+    "source_agent": "/root/arraylist_refined",
+    "completion_observed": true,
+    "checks": {
+      "verified": {
+        "expected": [
+          "区分索引越界与空指针异常",
+          "分析批量复制和插入复杂度"
+        ],
+        "actual": [
+          "区分索引越界与空指针异常"
+        ],
+        "pass": false
+      },
+      "session": {
+        "expected": "active",
+        "actual": "active",
+        "pass": true
+      },
+      "valid": {
+        "pass": true
+      }
+    },
+    "runtime_sha256": {
+      "SKILL.md": "ae6944401342c885720615d142c394a435b13ddfb32a362cd7aea980c212e30e",
+      "scripts\\learning.py": "c4f3994a2550856eb8862c7a60bdc4c7f3835a56d1fa38a4cb94e76bbb628c3e",
+      "scripts\\progress.py": "dbdc27e3d161a87be774b5962a32d86f47e0f35b9157487010432b3558d154cd",
+      "scripts\\sessions.py": "3123a811e30f6b1b256cf88cf485d886b31a7cbc11252b08efd4fe493460a1b1",
+      "scripts\\teaching.py": "68e7c0f4cdbf10efd8227f133ad4bd08f9739949b76f2855e8ead9b8e805b976",
+      "references\\onboarding.md": "8fb1d405afc41392b7d90ac720c431b88b82ab8da82043cc0b6a673a9b8cdcd0",
+      "references\\planning.md": "9ecd2ad7da49143efe46086f225d69085a836131f79a158428444716c82cf5a2",
+      "references\\progress.md": "32bf6f0fc5851591c838bdeaeea34bd157b9dfb98a938cdbca6002a0c2b0e193",
+      "references\\session.md": "e81b731b153d9ededfecdce64cc8af5b80c648fdf9da4b163d361538ea1bfe3d",
+      "references\\syllabus.md": "19dc39e5ac836f7ab90466e48323357301ac2186e43e77f8b9ffb803b836ea8d",
+      "references\\teaching.md": "93332847e2edc8cd25d381da8b773f1f51d6b0355885c26635bc0362c5164f7b"
+    },
+    "structural_pass": false
+  }
+]

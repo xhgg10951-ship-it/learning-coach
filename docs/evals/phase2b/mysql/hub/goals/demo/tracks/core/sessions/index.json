@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "kind": "session_index",
+  "goal_id": "demo",
+  "track_id": "core",
+  "signatures": [
+    {
+      "id": "SE-0b1ee2c78f9a40adb77e4ef12bc3470d",
+      "size": 9170,
+      "mtime_ns": 1791708790002444900
+    }
+  ],
+  "entries": [
+    {
+      "id": "SE-0b1ee2c78f9a40adb77e4ef12bc3470d",
+      "status": "active",
+      "topic": "订单统计 SQL 与执行计划分析",
+      "created_at": "2026-10-11T08:51:16.547958+00:00",
+      "updated_at": "2026-10-11T08:53:09.988996+00:00",
+      "completed_at": null,
+      "sprint_id": "SP001",
+      "start_request_id": "mysql-practice-start-01",
+      "previous_session_id": null
+    }
+  ],
+  "digest": "7a71a88c3df93f00d7242f89e85f90e10f7a1afc2e97cf79f24f1c3f30457bfc"
+}

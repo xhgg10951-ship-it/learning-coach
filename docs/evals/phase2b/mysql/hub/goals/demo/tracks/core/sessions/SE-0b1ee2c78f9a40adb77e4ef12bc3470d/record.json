@@ -1,0 +1,126 @@
+{
+  "schema_version": 2,
+  "session_version": 3,
+  "kind": "session",
+  "id": "SE-0b1ee2c78f9a40adb77e4ef12bc3470d",
+  "goal_id": "demo",
+  "track_id": "core",
+  "sprint_id": "SP001",
+  "sprint_snapshot": {
+    "id": "SP001",
+    "milestone_id": "M001",
+    "objective": "MySQL 查询与索引",
+    "criteria": [
+      "写出分组统计 SQL",
+      "根据 EXPLAIN 分析索引选择"
+    ]
+  },
+  "topic": "订单统计 SQL 与执行计划分析",
+  "status": "active",
+  "created_at": "2026-10-11T08:51:16.547958+00:00",
+  "updated_at": "2026-10-11T08:53:09.988996+00:00",
+  "completed_at": null,
+  "start_request_id": "mysql-practice-start-01",
+  "previous_session_id": null,
+  "events": [
+    {
+      "id": "user-background-01",
+      "kind": "content",
+      "text": "本隔离合成学生自报会 SELECT 和 JOIN；尚未通过实际作答验证。",
+      "basis": "user_report",
+      "sources": [
+        {
+          "ref": "agent-turn-01.json#/user",
+          "quote": "我会 SELECT 和 JOIN"
+        }
+      ]
+    },
+    {
+      "id": "practice-mode-01",
+      "kind": "teaching",
+      "text": "按用户本轮要求使用 Practice 模式，从订单统计 SQL 与执行计划综合实战开始。",
+      "basis": "user_report",
+      "sources": [
+        {
+          "ref": "agent-turn-01.json#/user",
+          "quote": "今天用 Practice 模式。请给一个订单统计的综合实战，包含 SQL 编写和执行计划分析，提供必要的表结构和样本执行计划。"
+        }
+      ],
+      "teaching": {
+        "mode": "practice",
+        "pace": "balanced",
+        "depth": "standard",
+        "exercise_policy": "allowed",
+        "difficulty": "根据用户自报的 SELECT 和 JOIN 基础，直接使用订单分组统计、时间边界与执行计划分析的综合实战；尚无独立能力证据。",
+        "reason": "用户明确指定 Practice 模式和综合实战；跳过基础语法讲解，等待实际 SQL 与计划分析再逐项评价。"
+      }
+    },
+    {
+      "id": "orders-practice-01",
+      "kind": "exercise",
+      "text": "已布置月度付费客户排行榜综合实战，提供 MySQL 表结构、小样本与明确标记为人工模拟的 A/B 执行计划；尚无用户作答。",
+      "basis": "unverified",
+      "sources": [
+        {
+          "ref": "agent-turn-01.json#/assistant",
+          "quote": "以下是**人工编写的教学模拟摘要，没有实际执行**。假设订单表有 200 万行，A、B 针对同一条满足上述需求的 SQL；每行的数值是优化器估算，不能当作真实耗时。它们也不是上面 10 行数据的运行结果。"
+        }
+      ],
+      "prompt": "直接用 **Practice 模式**做一个综合实战：**月度付费客户排行榜**。你已说明会 SELECT 和 JOIN，我们从实际统计需求开始。\n\n**任务一：写 SQL**\n\n统计 **2026 年 10 月**已支付订单，输出客户 ID、客户名、支付订单数、支付总额、最后支付订单的创建时间。要求：\n\n- 只统计 `status = 'PAID'`，以 `created_at` 判断所属月份。\n- 只保留当月支付订单数至少 2 笔、支付总额至少 100 元的客户。\n- 按支付总额降序、客户 ID 升序排列，取前 10 名。\n- 金额是订单总额；本题不考虑退款。时间均为同一业务时区。\n\n下面的结构和数据可用于 MySQL 8.0 / InnoDB 练习，请在练习数据库中运行：\n\n```sql\nCREATE TABLE customers (\n    customer_id BIGINT PRIMARY KEY,\n    customer_name VARCHAR(50) NOT NULL\n) ENGINE=InnoDB;\n\nCREATE TABLE orders (\n    order_id BIGINT PRIMARY KEY,\n    customer_id BIGINT NOT NULL,\n    created_at DATETIME NOT NULL,\n    status VARCHAR(12) NOT NULL,\n    amount DECIMAL(10,2) NOT NULL,\n    KEY idx_customer (customer_id)\n) ENGINE=InnoDB;\n\nINSERT INTO customers VALUES\n(1, '林一'), (2, '陈二'), (3, '王三'),\n(4, '李四'), (5, '周五');\n\nINSERT INTO orders VALUES\n(101, 1, '2026-09-30 23:59:59', 'PAID',      900.00),\n(102, 1, '2026-10-01 00:00:00', 'PAID',      120.00),\n(103, 1, '2026-10-10 12:00:00', 'PAID',       80.00),\n(104, 1, '2026-10-12 12:00:00', 'CANCELLED', 600.00),\n(105, 2, '2026-10-02 10:00:00', 'PAID',      300.00),\n(106, 2, '2026-10-20 10:00:00', 'PAID',      250.00),\n(107, 3, '2026-10-05 10:00:00', 'PAID',     1000.00),\n(108, 4, '2026-10-03 10:00:00', 'PAID',       50.00),\n(109, 4, '2026-10-31 23:59:59', 'PAID',       50.00),\n(110, 2, '2026-11-01 00:00:00', 'PAID',     9000.00);\n```\n\n提交一条完整 SQL，并简述日期边界、明细过滤和分组过滤如何处理。留意：样本包含月界、取消订单、单笔大额订单，以及两笔小额订单合计达标的情况。\n\n**任务二：分析执行计划**\n\n以下是**人工编写的教学模拟摘要，没有实际执行**。假设订单表有 200 万行，A、B 针对同一条满足上述需求的 SQL；每行的数值是优化器估算，不能当作真实耗时。它们也不是上面 10 行数据的运行结果。\n\n方案 A 只有建表时的索引：\n\n| table | type | key | rows | filtered | Extra |\n|---|---|---|---:|---:|---|\n| o | ALL | NULL | 2000000 | 1.50 | Using where; Using temporary; Using filesort |\n| c | eq_ref | PRIMARY | 1 | 100.00 | — |\n\n方案 B 假设增加了这个候选索引：\n\n```sql\nCREATE INDEX idx_status_time_cover\nON orders (status, created_at, customer_id, amount);\n```\n\n| table | type | key | rows | filtered | Extra |\n|---|---|---|---:|---:|---|\n| o | range | idx_status_time_cover | 30000 | 100.00 | Using where; Using index; Using temporary; Using filesort |\n| c | eq_ref | PRIMARY | 1 | 100.00 | — |\n\n围绕这两份计划，给出你的判断：\n\n1. `o` 从 `ALL` 变为 `range` 表示什么？`c` 的 `eq_ref` 与表结构有什么关系？\n2. 分别用 `rows × filtered / 100` 估算订单表过滤后留下的行数。为什么留下的数量相近，访问成本仍可能不同？\n3. 候选索引为什么这样排列？结合本题查询说明后两列的作用，以及 `Using index` 的含义。\n4. B 仍有 `Using temporary; Using filesort`，能否据此判定索引无效？又能否仅凭这两份计划确定 B 的实际耗时更短？说明理由和还需要的证据。\n\n**提交方式：**先发你的 SQL，再给 A/B 分析。若手边有数据库，可额外附上自己运行的 `EXPLAIN`；小样本可能出现不同计划，如实贴出即可，不必强行复现模拟结果。\n\n这组将观察“写出分组统计 SQL”和“根据 EXPLAIN 分析索引选择”两项能力；目前还没有你的作答，均未验证。",
+      "answer": "",
+      "result": "not_assessed",
+      "feedback": "本轮仅布置任务并提供教学材料，没有用户 SQL、解释或运行证据，不能判断掌握；未作答不视为失败。",
+      "assessment": {
+        "form": "SQL 编写与 EXPLAIN 执行计划分析",
+        "error_type": "unassessed",
+        "checks": [
+          {
+            "criterion": "写出分组统计 SQL",
+            "outcome": "unverified",
+            "reason": "尚未提交 SQL，不能评价分组统计能力。"
+          },
+          {
+            "criterion": "根据 EXPLAIN 分析索引选择",
+            "outcome": "unverified",
+            "reason": "仅提供人工模拟计划，尚未收到学生分析或实际执行证据。"
+          }
+        ]
+      }
+    }
+  ],
+  "checkpoints": [
+    {
+      "operation_id": "mysql-practice-checkpoint-01",
+      "kind": "checkpoint",
+      "at": "2026-10-11T08:53:09.988996+00:00",
+      "event_ids": [
+        "user-background-01",
+        "practice-mode-01",
+        "orders-practice-01"
+      ],
+      "handoff": {
+        "summary": "本轮为隔离合成学生教学。已按用户授权开始并记录订单统计 Practice Session；用户自报会 SELECT 和 JOIN。已提供月度付费客户排行榜综合任务、MySQL 建表及小样本、明确标识的人工模拟执行计划。尚未作答，两项验收均未验证。",
+        "next_step": "等待用户提交 SQL 和 A/B 执行计划分析，按实际表现分别评价分组统计与索引分析；只补真实缺口，不强制实际数据库环境。",
+        "focus_ids": [
+          "user-background-01",
+          "practice-mode-01",
+          "orders-practice-01"
+        ]
+      },
+      "digest": "3c4a4e0403469ce5d92eda1cae17e46e3ffcfccc96fe711baa9979ea5c55f2b4"
+    }
+  ],
+  "handoff": {
+    "summary": "本轮为隔离合成学生教学。已按用户授权开始并记录订单统计 Practice Session；用户自报会 SELECT 和 JOIN。已提供月度付费客户排行榜综合任务、MySQL 建表及小样本、明确标识的人工模拟执行计划。尚未作答，两项验收均未验证。",
+    "next_step": "等待用户提交 SQL 和 A/B 执行计划分析，按实际表现分别评价分组统计与索引分析；只补真实缺口，不强制实际数据库环境。",
+    "focus_ids": [
+      "user-background-01",
+      "practice-mode-01",
+      "orders-practice-01"
+    ]
+  },
+  "extensions": {
+    "knowledge_ids": [],
+    "review_candidates": []
+  }
+}

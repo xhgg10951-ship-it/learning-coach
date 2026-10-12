@@ -1,0 +1,69 @@
+{
+  "type": "live-agent-eval-with-synthetic-student",
+  "python": "3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]",
+  "codex": "codex-cli 0.162.0-alpha.17.2",
+  "source_sha256": {
+    "SKILL.md": "ae6944401342c885720615d142c394a435b13ddfb32a362cd7aea980c212e30e",
+    "tests\\agent_scenarios.json": "2a0e724bf170dc63576cc081d9b00095d931b786dd384c2fad14be6155197305",
+    "tests\\run_agent_scenarios.py": "7618b4942ead025b0a24f2a62cbb76ff7ba380058bdb1aedbddc541d8efc4fa7",
+    "scripts\\learning.py": "c4f3994a2550856eb8862c7a60bdc4c7f3835a56d1fa38a4cb94e76bbb628c3e",
+    "scripts\\progress.py": "dbdc27e3d161a87be774b5962a32d86f47e0f35b9157487010432b3558d154cd",
+    "scripts\\sessions.py": "3123a811e30f6b1b256cf88cf485d886b31a7cbc11252b08efd4fe493460a1b1",
+    "scripts\\teaching.py": "68e7c0f4cdbf10efd8227f133ad4bd08f9739949b76f2855e8ead9b8e805b976",
+    "references\\onboarding.md": "8fb1d405afc41392b7d90ac720c431b88b82ab8da82043cc0b6a673a9b8cdcd0",
+    "references\\planning.md": "9ecd2ad7da49143efe46086f225d69085a836131f79a158428444716c82cf5a2",
+    "references\\progress.md": "32bf6f0fc5851591c838bdeaeea34bd157b9dfb98a938cdbca6002a0c2b0e193",
+    "references\\session.md": "e81b731b153d9ededfecdce64cc8af5b80c648fdf9da4b163d361538ea1bfe3d",
+    "references\\syllabus.md": "19dc39e5ac836f7ab90466e48323357301ac2186e43e77f8b9ffb803b836ea8d",
+    "references\\teaching.md": "93332847e2edc8cd25d381da8b773f1f51d6b0355885c26635bc0362c5164f7b"
+  },
+  "engine": "native-independent-agent",
+  "cli_suite_completed": false,
+  "native_models": {
+    "/root/final_arraylist": "inherited; exact runtime model unavailable",
+    "/root/final_mysql": "inherited; exact runtime model unavailable",
+    "/root/final_english": "inherited; exact runtime model unavailable",
+    "/root/arraylist_economical": "gpt-6-sol / medium",
+    "/root/arraylist_refined": "gpt-6-sol / medium",
+    "/root/arraylist_verified": "gpt-6.1-sol / medium",
+    "/root/arraylist_continued": "gpt-6.1-sol / medium",
+    "/root/theory_economical": "gpt-6-luna / medium",
+    "/root/arraylist_resume_verified": "gpt-6.1-sol / medium"
+  },
+  "final_source_sha256": {
+    "SKILL.md": "ae6944401342c885720615d142c394a435b13ddfb32a362cd7aea980c212e30e",
+    "tests\\agent_scenarios.json": "2a0e724bf170dc63576cc081d9b00095d931b786dd384c2fad14be6155197305",
+    "tests\\run_agent_scenarios.py": "7618b4942ead025b0a24f2a62cbb76ff7ba380058bdb1aedbddc541d8efc4fa7",
+    "scripts\\learning.py": "c4f3994a2550856eb8862c7a60bdc4c7f3835a56d1fa38a4cb94e76bbb628c3e",
+    "scripts\\progress.py": "dbdc27e3d161a87be774b5962a32d86f47e0f35b9157487010432b3558d154cd",
+    "scripts\\sessions.py": "3123a811e30f6b1b256cf88cf485d886b31a7cbc11252b08efd4fe493460a1b1",
+    "scripts\\teaching.py": "68e7c0f4cdbf10efd8227f133ad4bd08f9739949b76f2855e8ead9b8e805b976",
+    "references\\onboarding.md": "8fb1d405afc41392b7d90ac720c431b88b82ab8da82043cc0b6a673a9b8cdcd0",
+    "references\\planning.md": "9ecd2ad7da49143efe46086f225d69085a836131f79a158428444716c82cf5a2",
+    "references\\progress.md": "32bf6f0fc5851591c838bdeaeea34bd157b9dfb98a938cdbca6002a0c2b0e193",
+    "references\\session.md": "e81b731b153d9ededfecdce64cc8af5b80c648fdf9da4b163d361538ea1bfe3d",
+    "references\\syllabus.md": "19dc39e5ac836f7ab90466e48323357301ac2186e43e77f8b9ffb803b836ea8d",
+    "references\\teaching.md": "93332847e2edc8cd25d381da8b773f1f51d6b0355885c26635bc0362c5164f7b"
+  },
+  "domain_source_manifest": {
+    "type": "live-agent-eval-with-synthetic-student",
+    "python": "3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]",
+    "codex": "codex-cli 0.162.0-alpha.17.2",
+    "source_sha256": {
+      "SKILL.md": "ae6944401342c885720615d142c394a435b13ddfb32a362cd7aea980c212e30e",
+      "tests\\agent_scenarios.json": "2a0e724bf170dc63576cc081d9b00095d931b786dd384c2fad14be6155197305",
+      "tests\\run_agent_scenarios.py": "7618b4942ead025b0a24f2a62cbb76ff7ba380058bdb1aedbddc541d8efc4fa7",
+      "scripts\\learning.py": "c4f3994a2550856eb8862c7a60bdc4c7f3835a56d1fa38a4cb94e76bbb628c3e",
+      "scripts\\progress.py": "dbdc27e3d161a87be774b5962a32d86f47e0f35b9157487010432b3558d154cd",
+      "scripts\\sessions.py": "3123a811e30f6b1b256cf88cf485d886b31a7cbc11252b08efd4fe493460a1b1",
+      "scripts\\teaching.py": "68e7c0f4cdbf10efd8227f133ad4bd08f9739949b76f2855e8ead9b8e805b976",
+      "references\\onboarding.md": "8fb1d405afc41392b7d90ac720c431b88b82ab8da82043cc0b6a673a9b8cdcd0",
+      "references\\planning.md": "9ecd2ad7da49143efe46086f225d69085a836131f79a158428444716c82cf5a2",
+      "references\\progress.md": "32bf6f0fc5851591c838bdeaeea34bd157b9dfb98a938cdbca6002a0c2b0e193",
+      "references\\session.md": "e81b731b153d9ededfecdce64cc8af5b80c648fdf9da4b163d361538ea1bfe3d",
+      "references\\syllabus.md": "19dc39e5ac836f7ab90466e48323357301ac2186e43e77f8b9ffb803b836ea8d",
+      "references\\teaching.md": "a1440be9542734eab321a0708d2f43b8d7dd99a70a3abcc47453db977d35ff8a"
+    }
+  },
+  "source_notes": "The final ArrayList run starts from a fresh fixture with the variable-definition guidance. The domain runs use the preceding Skill snapshot; their task-creation turns do not grade student answers. All runs use the same final Python implementation. Per-turn runtime hashes are retained."
+}

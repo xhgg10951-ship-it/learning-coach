@@ -1,0 +1,59 @@
+{
+  "schema_version": 2,
+  "kind": "session_index",
+  "goal_id": "demo",
+  "track_id": "core",
+  "signatures": [
+    {
+      "id": "SE-23ef722ad0824f938983ff5a1d2ff6f8",
+      "size": 50789,
+      "mtime_ns": 1791763619442385600
+    },
+    {
+      "id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+      "size": 5428,
+      "mtime_ns": 1791730194791931300
+    },
+    {
+      "id": "SE-cfdcb3c318aa438fa70a3b2c32660e86",
+      "size": 10268,
+      "mtime_ns": 1791764359184448100
+    }
+  ],
+  "entries": [
+    {
+      "id": "SE-cfdcb3c318aa438fa70a3b2c32660e86",
+      "status": "completed",
+      "topic": "ArrayList 均摊常数上限原理续讲",
+      "created_at": "2026-10-12T00:08:51.384314+00:00",
+      "updated_at": "2026-10-12T00:19:19.169938+00:00",
+      "completed_at": "2026-10-12T00:19:19.169938+00:00",
+      "sprint_id": "SP001",
+      "start_request_id": "arraylist-resume-turn-10",
+      "previous_session_id": "SE-23ef722ad0824f938983ff5a1d2ff6f8"
+    },
+    {
+      "id": "SE-23ef722ad0824f938983ff5a1d2ff6f8",
+      "status": "completed",
+      "topic": "ArrayList 异常边界与批量复制综合实践",
+      "created_at": "2026-10-11T14:50:55.286834+00:00",
+      "updated_at": "2026-10-12T00:06:59.437857+00:00",
+      "completed_at": "2026-10-12T00:06:59.437857+00:00",
+      "sprint_id": "SP001",
+      "start_request_id": "arraylist-practice-turn-01",
+      "previous_session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3"
+    },
+    {
+      "id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+      "status": "completed",
+      "topic": "ArrayList",
+      "created_at": "2026-10-11T14:49:54.664637+00:00",
+      "updated_at": "2026-10-11T14:49:54.787239+00:00",
+      "completed_at": "2026-10-11T14:49:54.787239+00:00",
+      "sprint_id": "SP001",
+      "start_request_id": "fixture-history",
+      "previous_session_id": null
+    }
+  ],
+  "digest": "572dc5f6c814239e108c4692f2e4e5859b2a95f2c4b122f794f3db1dedddfc57"
+}

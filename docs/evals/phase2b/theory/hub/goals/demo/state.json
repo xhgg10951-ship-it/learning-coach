@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "kind": "goal",
+  "id": "demo",
+  "title": "缓存一致性理论",
+  "status": "active",
+  "created_at": "2026-10-11T08:49:35.504183+00:00",
+  "updated_at": "2026-10-11T08:49:35.504212+00:00",
+  "extensions": {},
+  "profile": {
+    "description": "",
+    "level": "了解数据库与缓存的基础概念",
+    "motivation": "",
+    "ability": ""
+  },
+  "history": [
+    {
+      "at": "2026-10-11T08:49:35.504212+00:00",
+      "kind": "goal",
+      "id": "demo",
+      "event": "create",
+      "note": "创建学习目标",
+      "before": null,
+      "after": {
+        "description": "",
+        "level": "了解数据库与缓存的基础概念",
+        "motivation": "",
+        "ability": ""
+      }
+    }
+  ]
+}

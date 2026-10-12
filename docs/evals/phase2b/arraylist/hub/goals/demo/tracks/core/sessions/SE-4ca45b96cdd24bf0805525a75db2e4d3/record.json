@@ -1,0 +1,161 @@
+{
+  "schema_version": 2,
+  "session_version": 1,
+  "kind": "session",
+  "id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+  "goal_id": "demo",
+  "track_id": "core",
+  "sprint_id": "SP001",
+  "sprint_snapshot": {
+    "id": "SP001",
+    "milestone_id": "M001",
+    "objective": "Java ArrayList",
+    "criteria": [
+      "解释 ArrayList 基本操作、size 和容量",
+      "解释扩容和均摊复杂度",
+      "区分索引越界与空指针异常",
+      "分析批量复制和插入复杂度",
+      "独立实现并运行综合案例"
+    ]
+  },
+  "topic": "ArrayList",
+  "status": "completed",
+  "created_at": "2026-10-11T14:49:54.664637+00:00",
+  "updated_at": "2026-10-11T14:49:54.787239+00:00",
+  "completed_at": "2026-10-11T14:49:54.787239+00:00",
+  "start_request_id": "fixture-history",
+  "previous_session_id": null,
+  "events": [
+    {
+      "id": "prior-task",
+      "kind": "exercise",
+      "text": "合成学生先前作答",
+      "basis": "exercise_verified",
+      "sources": [
+        {
+          "ref": "synthetic-fixture/user/1",
+          "quote": "size 是元素数；容量是底层空间。扩容需要复制。get(size) 是空指针，批量复制只调一次所以常数时间。"
+        }
+      ],
+      "prompt": "解释 size、容量、扩容、边界异常和批量复制成本",
+      "answer": "size 是元素数；容量是底层空间。扩容需要复制。get(size) 是空指针，批量复制只调一次所以常数时间。",
+      "result": "partial",
+      "feedback": "基本操作与扩容机制正确；索引越界及批量复制复杂度判断错误。"
+    },
+    {
+      "id": "prior-correct-0",
+      "kind": "exercise",
+      "text": "合成学生先前作答",
+      "basis": "exercise_verified",
+      "sources": [
+        {
+          "ref": "synthetic-fixture/user/2",
+          "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+        }
+      ],
+      "prompt": "解释 size、容量、扩容、边界异常和批量复制成本",
+      "answer": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。",
+      "result": "correct",
+      "feedback": "合成历史答案正确，作为验收输入"
+    },
+    {
+      "id": "prior-evidence-0",
+      "kind": "evidence",
+      "text": "解释 ArrayList 基本操作、size 和容量",
+      "basis": "exercise_verified",
+      "sources": [
+        {
+          "ref": "synthetic-fixture/user/2",
+          "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+        }
+      ],
+      "criterion": "解释 ArrayList 基本操作、size 和容量",
+      "outcome": "met",
+      "related_ids": [
+        "prior-correct-0"
+      ]
+    },
+    {
+      "id": "prior-correct-1",
+      "kind": "exercise",
+      "text": "合成学生先前作答",
+      "basis": "exercise_verified",
+      "sources": [
+        {
+          "ref": "synthetic-fixture/user/3",
+          "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+        }
+      ],
+      "prompt": "解释 size、容量、扩容、边界异常和批量复制成本",
+      "answer": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。",
+      "result": "correct",
+      "feedback": "合成历史答案正确，作为验收输入"
+    },
+    {
+      "id": "prior-evidence-1",
+      "kind": "evidence",
+      "text": "解释扩容和均摊复杂度",
+      "basis": "exercise_verified",
+      "sources": [
+        {
+          "ref": "synthetic-fixture/user/3",
+          "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+        }
+      ],
+      "criterion": "解释扩容和均摊复杂度",
+      "outcome": "met",
+      "related_ids": [
+        "prior-correct-1"
+      ]
+    },
+    {
+      "id": "prior-gap",
+      "kind": "weakness",
+      "text": "曾混淆索引越界与空指针，误判批量复制复杂度",
+      "basis": "exercise_verified",
+      "sources": [
+        {
+          "ref": "synthetic-fixture/user/1",
+          "quote": "size 是元素数；容量是底层空间。扩容需要复制。get(size) 是空指针，批量复制只调一次所以常数时间。"
+        }
+      ],
+      "related_ids": [
+        "prior-task"
+      ]
+    }
+  ],
+  "checkpoints": [
+    {
+      "operation_id": "fixture-finish",
+      "kind": "finish",
+      "at": "2026-10-11T14:49:54.787239+00:00",
+      "event_ids": [
+        "prior-task",
+        "prior-correct-0",
+        "prior-evidence-0",
+        "prior-correct-1",
+        "prior-evidence-1",
+        "prior-gap"
+      ],
+      "handoff": {
+        "summary": "合成历史：已有集合基础，异常和复制成本不稳定",
+        "next_step": "用实际案例聚焦异常与批量复制",
+        "focus_ids": [
+          "prior-gap"
+        ]
+      },
+      "digest": "12b000926f43e5e5326f1ed4da705c69712da28972556e4af968120a56ac6c27"
+    }
+  ],
+  "handoff": {
+    "summary": "合成历史：已有集合基础，异常和复制成本不稳定",
+    "next_step": "用实际案例聚焦异常与批量复制",
+    "focus_ids": [
+      "prior-gap"
+    ]
+  },
+  "extensions": {
+    "knowledge_ids": [],
+    "review_candidates": []
+  }
+}

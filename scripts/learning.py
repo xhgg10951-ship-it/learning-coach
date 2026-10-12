@@ -739,7 +739,7 @@ def parser():
 def run(args):
     hub = Hub(args.hub)
     command = args.command
-    if command.startswith("session-") and command != "session-spec":
+    if command == "teaching-context" or (command.startswith("session-") and command != "session-spec"):
         if __package__:
             from .sessions import run as run_session
         else:

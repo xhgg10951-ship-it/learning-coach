@@ -1,0 +1,4 @@
+# Keep raw evaluation evidence and its checksums stable across checkouts.
+docs/evals/phase2b/** -text whitespace=cr-at-eol
+# Generated Session notes preserve blank quoted lines from the original source.
+docs/evals/phase2b/**/note.md whitespace=cr-at-eol,-blank-at-eol

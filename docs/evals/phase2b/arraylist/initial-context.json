@@ -1,0 +1,446 @@
+{
+  "goal": {
+    "id": "demo",
+    "title": "Java ArrayList",
+    "status": "active"
+  },
+  "track": {
+    "id": "core",
+    "title": "Java ArrayList",
+    "status": "active"
+  },
+  "profiles": {
+    "common": "# 合成学生测试画像\n已有相关基础，偏好实际任务；所有内容为验收夹具，不是实际用户学习记录。\n",
+    "goal": {
+      "description": "",
+      "level": "已有 Java 集合基础，能解释常用操作和扩容；异常边界和复制成本仍不稳定",
+      "motivation": "",
+      "ability": ""
+    },
+    "goal_notes": "# Java ArrayList\n\nID: `demo`\n\n画像字段和状态以 state.json 为准。此处保留偏好、补充背景和用户提供的原始说明。\n\n## 补充画像\n\n## 用户反馈\n",
+    "track_notes": "# Java ArrayList\n\nID: `core`\n\n状态、依赖和能力验收以 state.json 为准。\n\n## 粗略能力方向\n\n## 资料\n\n## 用户反馈\n"
+  },
+  "current_milestone": {
+    "schema_version": 2,
+    "kind": "milestone",
+    "id": "M001",
+    "title": "应用能力",
+    "status": "active",
+    "created_at": "2026-10-11T14:49:54.351925+00:00",
+    "updated_at": "2026-10-11T14:49:54.351925+00:00",
+    "extensions": {},
+    "objective": "Java ArrayList",
+    "criteria": [
+      "解释 ArrayList 基本操作、size 和容量",
+      "解释扩容和均摊复杂度",
+      "区分索引越界与空指针异常",
+      "分析批量复制和插入复杂度",
+      "独立实现并运行综合案例"
+    ],
+    "estimated_hours": 30
+  },
+  "current_sprint": {
+    "schema_version": 2,
+    "kind": "sprint",
+    "id": "SP001",
+    "title": "Java ArrayList",
+    "status": "active",
+    "created_at": "2026-10-11T14:49:54.443279+00:00",
+    "updated_at": "2026-10-11T14:49:54.443279+00:00",
+    "extensions": {},
+    "objective": "Java ArrayList",
+    "criteria": [
+      "解释 ArrayList 基本操作、size 和容量",
+      "解释扩容和均摊复杂度",
+      "区分索引越界与空指针异常",
+      "分析批量复制和插入复杂度",
+      "独立实现并运行综合案例"
+    ],
+    "estimated_hours": 5,
+    "milestone_id": "M001"
+  },
+  "topic": null,
+  "learning_allowed": true,
+  "active_session_id": null,
+  "teaching_state": {
+    "mode": "adaptive",
+    "pace": "balanced",
+    "depth": "standard",
+    "exercise_policy": "allowed",
+    "difficulty": "尚无教学难度记录",
+    "reason": "依据画像、真实证据和用户本次选择确定起点；不默认从零开始。",
+    "source": null
+  },
+  "criteria": [
+    {
+      "criterion": "解释 ArrayList 基本操作、size 和容量",
+      "status": "verified",
+      "decisive_evidence": {
+        "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+        "event_id": "prior-evidence-0",
+        "at": "2026-10-11T14:49:54.787239+00:00",
+        "basis": "exercise_verified",
+        "text": "解释 ArrayList 基本操作、size 和容量",
+        "sources": [
+          {
+            "ref": "synthetic-fixture/user/2",
+            "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+          }
+        ],
+        "outcome": "met",
+        "observed_at": "2026-10-11T14:49:54.787239+00:00",
+        "reason": "解释 ArrayList 基本操作、size 和容量",
+        "related_ids": [
+          "prior-correct-0"
+        ]
+      },
+      "evidence": [
+        {
+          "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+          "event_id": "prior-evidence-0",
+          "at": "2026-10-11T14:49:54.787239+00:00",
+          "basis": "exercise_verified",
+          "text": "解释 ArrayList 基本操作、size 和容量",
+          "sources": [
+            {
+              "ref": "synthetic-fixture/user/2",
+              "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+            }
+          ],
+          "outcome": "met",
+          "observed_at": "2026-10-11T14:49:54.787239+00:00",
+          "reason": "解释 ArrayList 基本操作、size 和容量",
+          "related_ids": [
+            "prior-correct-0"
+          ]
+        }
+      ]
+    },
+    {
+      "criterion": "解释扩容和均摊复杂度",
+      "status": "verified",
+      "decisive_evidence": {
+        "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+        "event_id": "prior-evidence-1",
+        "at": "2026-10-11T14:49:54.787239+00:00",
+        "basis": "exercise_verified",
+        "text": "解释扩容和均摊复杂度",
+        "sources": [
+          {
+            "ref": "synthetic-fixture/user/3",
+            "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+          }
+        ],
+        "outcome": "met",
+        "observed_at": "2026-10-11T14:49:54.787239+00:00",
+        "reason": "解释扩容和均摊复杂度",
+        "related_ids": [
+          "prior-correct-1"
+        ]
+      },
+      "evidence": [
+        {
+          "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+          "event_id": "prior-evidence-1",
+          "at": "2026-10-11T14:49:54.787239+00:00",
+          "basis": "exercise_verified",
+          "text": "解释扩容和均摊复杂度",
+          "sources": [
+            {
+              "ref": "synthetic-fixture/user/3",
+              "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+            }
+          ],
+          "outcome": "met",
+          "observed_at": "2026-10-11T14:49:54.787239+00:00",
+          "reason": "解释扩容和均摊复杂度",
+          "related_ids": [
+            "prior-correct-1"
+          ]
+        }
+      ]
+    },
+    {
+      "criterion": "区分索引越界与空指针异常",
+      "status": "unverified",
+      "decisive_evidence": null,
+      "evidence": []
+    },
+    {
+      "criterion": "分析批量复制和插入复杂度",
+      "status": "unverified",
+      "decisive_evidence": null,
+      "evidence": []
+    },
+    {
+      "criterion": "独立实现并运行综合案例",
+      "status": "unverified",
+      "decisive_evidence": null,
+      "evidence": []
+    }
+  ],
+  "verified_abilities": [
+    "解释 ArrayList 基本操作、size 和容量",
+    "解释扩容和均摊复杂度"
+  ],
+  "remaining_gaps": [
+    "区分索引越界与空指针异常",
+    "分析批量复制和插入复杂度",
+    "独立实现并运行综合案例"
+  ],
+  "exercises": [
+    {
+      "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+      "event_id": "prior-task",
+      "at": "2026-10-11T14:49:54.787239+00:00",
+      "basis": "exercise_verified",
+      "text": "合成学生先前作答",
+      "sources": [
+        {
+          "ref": "synthetic-fixture/user/1",
+          "quote": "size 是元素数；容量是底层空间。扩容需要复制。get(size) 是空指针，批量复制只调一次所以常数时间。"
+        }
+      ],
+      "prompt": "解释 size、容量、扩容、边界异常和批量复制成本",
+      "answer": "size 是元素数；容量是底层空间。扩容需要复制。get(size) 是空指针，批量复制只调一次所以常数时间。",
+      "result": "partial",
+      "feedback": "基本操作与扩容机制正确；索引越界及批量复制复杂度判断错误。"
+    },
+    {
+      "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+      "event_id": "prior-correct-0",
+      "at": "2026-10-11T14:49:54.787239+00:00",
+      "basis": "exercise_verified",
+      "text": "合成学生先前作答",
+      "sources": [
+        {
+          "ref": "synthetic-fixture/user/2",
+          "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+        }
+      ],
+      "prompt": "解释 size、容量、扩容、边界异常和批量复制成本",
+      "answer": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。",
+      "result": "correct",
+      "feedback": "合成历史答案正确，作为验收输入"
+    },
+    {
+      "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+      "event_id": "prior-correct-1",
+      "at": "2026-10-11T14:49:54.787239+00:00",
+      "basis": "exercise_verified",
+      "text": "合成学生先前作答",
+      "sources": [
+        {
+          "ref": "synthetic-fixture/user/3",
+          "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+        }
+      ],
+      "prompt": "解释 size、容量、扩容、边界异常和批量复制成本",
+      "answer": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。",
+      "result": "correct",
+      "feedback": "合成历史答案正确，作为验收输入"
+    }
+  ],
+  "weaknesses_and_unresolved": [
+    {
+      "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+      "event_id": "prior-gap",
+      "at": "2026-10-11T14:49:54.787239+00:00",
+      "basis": "exercise_verified",
+      "text": "曾混淆索引越界与空指针，误判批量复制复杂度",
+      "sources": [
+        {
+          "ref": "synthetic-fixture/user/1",
+          "quote": "size 是元素数；容量是底层空间。扩容需要复制。get(size) 是空指针，批量复制只调一次所以常数时间。"
+        }
+      ],
+      "kind": "weakness",
+      "scope": "historical_observation; consult latest criterion evidence"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+      "status": "completed",
+      "topic": "ArrayList",
+      "created_at": "2026-10-11T14:49:54.664637+00:00",
+      "updated_at": "2026-10-11T14:49:54.787239+00:00",
+      "completed_at": "2026-10-11T14:49:54.787239+00:00",
+      "sprint_id": "SP001",
+      "start_request_id": "fixture-history",
+      "previous_session_id": null,
+      "goal_id": "demo",
+      "track_id": "core",
+      "persisted": true,
+      "session_version": 1,
+      "correction_count": 0,
+      "event_count": 6,
+      "checkpoint_count": 1,
+      "record_path": "E:\\learning-coach\\.test-tmp\\phase2b-native-verified\\arraylist\\workspace\\hub\\goals\\demo\\tracks\\core\\sessions\\SE-4ca45b96cdd24bf0805525a75db2e4d3\\record.json",
+      "note_path": "E:\\learning-coach\\.test-tmp\\phase2b-native-verified\\arraylist\\workspace\\hub\\goals\\demo\\tracks\\core\\sessions\\SE-4ca45b96cdd24bf0805525a75db2e4d3\\note.md",
+      "note_exists": true,
+      "handoff": {
+        "summary": "合成历史：已有集合基础，异常和复制成本不稳定",
+        "next_step": "用实际案例聚焦异常与批量复制",
+        "focus_ids": [
+          "prior-gap"
+        ]
+      },
+      "focus": [
+        {
+          "id": "prior-gap",
+          "kind": "weakness",
+          "basis": "exercise_verified",
+          "text": "曾混淆索引越界与空指针，误判批量复制复杂度",
+          "detail_truncated": false
+        }
+      ],
+      "teaching_state": null,
+      "criteria_evidence": [
+        {
+          "criterion": "解释 ArrayList 基本操作、size 和容量",
+          "status": "verified",
+          "decisive_evidence": {
+            "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+            "event_id": "prior-evidence-0",
+            "at": "2026-10-11T14:49:54.787239+00:00",
+            "basis": "exercise_verified",
+            "text": "解释 ArrayList 基本操作、size 和容量",
+            "sources": [
+              {
+                "ref": "synthetic-fixture/user/2",
+                "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+              }
+            ],
+            "outcome": "met",
+            "observed_at": "2026-10-11T14:49:54.787239+00:00",
+            "reason": "解释 ArrayList 基本操作、size 和容量",
+            "related_ids": [
+              "prior-correct-0"
+            ]
+          },
+          "evidence": [
+            {
+              "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+              "event_id": "prior-evidence-0",
+              "at": "2026-10-11T14:49:54.787239+00:00",
+              "basis": "exercise_verified",
+              "text": "解释 ArrayList 基本操作、size 和容量",
+              "sources": [
+                {
+                  "ref": "synthetic-fixture/user/2",
+                  "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+                }
+              ],
+              "outcome": "met",
+              "observed_at": "2026-10-11T14:49:54.787239+00:00",
+              "reason": "解释 ArrayList 基本操作、size 和容量",
+              "related_ids": [
+                "prior-correct-0"
+              ]
+            }
+          ]
+        },
+        {
+          "criterion": "解释扩容和均摊复杂度",
+          "status": "verified",
+          "decisive_evidence": {
+            "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+            "event_id": "prior-evidence-1",
+            "at": "2026-10-11T14:49:54.787239+00:00",
+            "basis": "exercise_verified",
+            "text": "解释扩容和均摊复杂度",
+            "sources": [
+              {
+                "ref": "synthetic-fixture/user/3",
+                "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+              }
+            ],
+            "outcome": "met",
+            "observed_at": "2026-10-11T14:49:54.787239+00:00",
+            "reason": "解释扩容和均摊复杂度",
+            "related_ids": [
+              "prior-correct-1"
+            ]
+          },
+          "evidence": [
+            {
+              "session_id": "SE-4ca45b96cdd24bf0805525a75db2e4d3",
+              "event_id": "prior-evidence-1",
+              "at": "2026-10-11T14:49:54.787239+00:00",
+              "basis": "exercise_verified",
+              "text": "解释扩容和均摊复杂度",
+              "sources": [
+                {
+                  "ref": "synthetic-fixture/user/3",
+                  "quote": "size 是元素数；容量是底层空间。几何扩容需要复制，单次 O(n)，追加均摊 O(1)。"
+                }
+              ],
+              "outcome": "met",
+              "observed_at": "2026-10-11T14:49:54.787239+00:00",
+              "reason": "解释扩容和均摊复杂度",
+              "related_ids": [
+                "prior-correct-1"
+              ]
+            }
+          ]
+        },
+        {
+          "criterion": "区分索引越界与空指针异常",
+          "status": "unverified",
+          "decisive_evidence": null,
+          "evidence": []
+        },
+        {
+          "criterion": "分析批量复制和插入复杂度",
+          "status": "unverified",
+          "decisive_evidence": null,
+          "evidence": []
+        },
+        {
+          "criterion": "独立实现并运行综合案例",
+          "status": "unverified",
+          "decisive_evidence": null,
+          "evidence": []
+        }
+      ],
+      "verified_abilities": [],
+      "unstable_points": [
+        {
+          "id": "prior-gap",
+          "kind": "weakness",
+          "basis": "exercise_verified",
+          "text": "曾混淆索引越界与空指针，误判批量复制复杂度",
+          "detail_truncated": false
+        }
+      ],
+      "unresolved_questions": [],
+      "understanding": [],
+      "omitted_event_count": 5
+    }
+  ],
+  "history": {
+    "scope": "selected_track_only",
+    "selected_ids": [
+      "SE-4ca45b96cdd24bf0805525a75db2e4d3"
+    ],
+    "omitted_sessions": 0,
+    "complete": true,
+    "index_status": "current"
+  },
+  "recommendation": {
+    "practice": "user_choice",
+    "avoid_basic_repetition": [
+      "解释 ArrayList 基本操作、size 和容量",
+      "解释扩容和均摊复杂度"
+    ],
+    "target_gaps": [
+      "区分索引越界与空指针异常",
+      "分析批量复制和插入复杂度",
+      "独立实现并运行综合案例"
+    ],
+    "may_suggest_sprint_completion": false,
+    "reason": "仅根据有效独立证据；缺少证据不等于能力不足。时长、题数、讲解次数不参与判断。",
+    "lifecycle_action": "none"
+  }
+}

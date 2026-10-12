@@ -1,0 +1,130 @@
+{
+  "schema_version": 2,
+  "session_version": 3,
+  "kind": "session",
+  "id": "SE-3727b9f06dab45e9ad146a099789ce79",
+  "goal_id": "demo",
+  "track_id": "core",
+  "sprint_id": "SP001",
+  "sprint_snapshot": {
+    "id": "SP001",
+    "milestone_id": "M001",
+    "objective": "英语职场表达",
+    "criteria": [
+      "在请假场景礼貌表达请求",
+      "根据对象调整语气"
+    ]
+  },
+  "topic": "英语职场表达：向主管请假并按语气改写",
+  "status": "active",
+  "created_at": "2026-10-11T08:51:07.089561+00:00",
+  "updated_at": "2026-10-11T08:52:25.523839+00:00",
+  "completed_at": null,
+  "start_request_id": "english-leave-start-01",
+  "previous_session_id": null,
+  "events": [
+    {
+      "id": "english-intent-01",
+      "kind": "content",
+      "text": "合成学生要求开始并记录英语职场请假交流练习，希望先自行表达，再按语气改写，不背语法定义；本记录仅属于隔离合成学习场景。",
+      "basis": "user_report",
+      "sources": [
+        {
+          "ref": "agent-turn-01.json#/user",
+          "quote": "开始学习并记录。今天练英语，给我一个向主管请假的交流场景，我想试着表达，再根据语气改写，不想背语法定义。"
+        },
+        {
+          "ref": "learning.py teaching-context/profiles.common",
+          "quote": "所有内容为验收夹具，不是实际用户学习记录。"
+        }
+      ]
+    },
+    {
+      "id": "english-teaching-01",
+      "kind": "teaching",
+      "text": "按本轮要求采用情境表达和改写实践，先让学生自行表达，再根据实际作答给反馈；不先讲语法定义。",
+      "basis": "user_report",
+      "sources": [
+        {
+          "ref": "agent-turn-01.json#/user",
+          "quote": "开始学习并记录。今天练英语，给我一个向主管请假的交流场景，我想试着表达，再根据语气改写，不想背语法定义。"
+        }
+      ],
+      "teaching": {
+        "mode": "practice",
+        "pace": "balanced",
+        "depth": "standard",
+        "exercise_policy": "allowed",
+        "difficulty": "从简单职场请求进入半天请假情境：表达请求、请假时间和工作安排；尚无作答，不推定掌握水平。",
+        "reason": "用户明确要求先试着表达，再根据语气改写；已读画像自报能表达简单工作请求，但还没有练习验证。"
+      }
+    },
+    {
+      "id": "english-leave-exercise-01",
+      "kind": "exercise",
+      "text": "给出向友好的直属主管请半天假的交流场景；先等学生写首版，后续再按对象调整语气。",
+      "basis": "unverified",
+      "sources": [
+        {
+          "ref": "agent-turn-01.json#/assistant",
+          "quote": "场景：你想请周五下午半天假处理私事。直属主管 Alex 平时很好沟通；你会在周五上午交完周报，同事 Mei 已同意接手下午的紧急事项。\n\n我扮演 Alex：**“Hi, you wanted to talk to me?”**\n\n轮到你了：用 2～4 句英文提出请求，交代请假时间和工作安排。按你现在会的说就行。\n\n等你写完，我们先看意思是否清楚、请求是否礼貌，再改成对不太熟悉的部门主管说的版本，体会语气差别。"
+        }
+      ],
+      "prompt": "场景：你想请周五下午半天假处理私事。直属主管 Alex 平时很好沟通；你会在周五上午交完周报，同事 Mei 已同意接手下午的紧急事项。\n\n我扮演 Alex：**“Hi, you wanted to talk to me?”**\n\n轮到你了：用 2～4 句英文提出请求，交代请假时间和工作安排。按你现在会的说就行。\n\n等你写完，我们先看意思是否清楚、请求是否礼貌，再改成对不太熟悉的部门主管说的版本，体会语气差别。",
+      "answer": "",
+      "result": "not_assessed",
+      "feedback": "尚未收到学生表达，未批改；下一步先根据实际首版检查意思与礼貌程度，再进行语气改写。",
+      "assessment": {
+        "form": "英语职场情境交流与语气改写",
+        "error_type": "unassessed",
+        "checks": [
+          {
+            "criterion": "在请假场景礼貌表达请求",
+            "outcome": "unverified",
+            "reason": "仅已布置情境表达任务，学生尚未作答。"
+          },
+          {
+            "criterion": "根据对象调整语气",
+            "outcome": "unverified",
+            "reason": "尚未收到首版表达及后续针对不同对象的改写。"
+          }
+        ]
+      }
+    }
+  ],
+  "checkpoints": [
+    {
+      "operation_id": "english-leave-checkpoint-01",
+      "kind": "checkpoint",
+      "at": "2026-10-11T08:52:25.523839+00:00",
+      "event_ids": [
+        "english-intent-01",
+        "english-teaching-01",
+        "english-leave-exercise-01"
+      ],
+      "handoff": {
+        "summary": "合成学生隔离学习：已开始英语职场请假表达 Session，按用户要求采用情境实践，已给出向直属主管 Alex 请周五下午半天假的场景。尚无学生作答，没有已验证能力或错误结论。",
+        "next_step": "等待学生首版英文请求；收到后按清楚程度与礼貌程度反馈，再邀请改写为对不太熟悉的部门主管的表达。无需背语法定义；允许学生自行调整节奏。",
+        "focus_ids": [
+          "english-intent-01",
+          "english-teaching-01",
+          "english-leave-exercise-01"
+        ]
+      },
+      "digest": "b935092cd131dfb20276e4036570f326bff23759e6f8f846f448de1f2c745282"
+    }
+  ],
+  "handoff": {
+    "summary": "合成学生隔离学习：已开始英语职场请假表达 Session，按用户要求采用情境实践，已给出向直属主管 Alex 请周五下午半天假的场景。尚无学生作答，没有已验证能力或错误结论。",
+    "next_step": "等待学生首版英文请求；收到后按清楚程度与礼貌程度反馈，再邀请改写为对不太熟悉的部门主管的表达。无需背语法定义；允许学生自行调整节奏。",
+    "focus_ids": [
+      "english-intent-01",
+      "english-teaching-01",
+      "english-leave-exercise-01"
+    ]
+  },
+  "extensions": {
+    "knowledge_ids": [],
+    "review_candidates": []
+  }
+}

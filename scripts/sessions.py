@@ -15,11 +15,11 @@ if __package__:
 else:
     from learning import LearningError, _atomic, _id, _load, _save, _text, now, _unique_object, _invalid_constant
 
-KINDS = {"content", "question", "explanation", "exercise", "weakness", "unresolved", "understanding", "evidence"}
+KINDS = {"content", "question", "explanation", "exercise", "weakness", "unresolved", "understanding", "evidence", "teaching"}
 BASES = {"user_report", "ai_assessment", "exercise_verified", "unverified"}
 LABELS = {"content": "实际学习内容", "question": "用户问题", "explanation": "关键解释与结论",
           "exercise": "练习与批改", "weakness": "暴露的薄弱点", "unresolved": "未解决的问题",
-          "understanding": "用户理解反馈", "evidence": "Sprint 验收证据"}
+          "understanding": "用户理解反馈", "evidence": "Sprint 验收证据", "teaching": "教学调整与依据"}
 BASIS_LABELS = {"user_report": "用户自报", "ai_assessment": "AI 判断",
                 "exercise_verified": "练习验证", "unverified": "尚未验证"}
 
@@ -84,7 +84,7 @@ def read_payload(path):
 def check_event(event, previous, sprint):
     fields(event, {"id", "kind", "text", "basis", "sources"},
            {"related_ids", "supersedes", "prompt", "answer", "result", "feedback",
-            "understanding", "criterion", "outcome", "knowledge_ids", "review_candidates"})
+            "understanding", "criterion", "outcome", "knowledge_ids", "review_candidates", "assessment", "teaching"})
     _id(event["id"], "event")
     if event["id"] in previous:
         raise LearningError(f"事实 ID 重复: {event['id']}；重试使用原 operation_id")
@@ -106,6 +106,11 @@ def check_event(event, previous, sprint):
         if identity not in previous:
             raise LearningError(f"事实引用必须指向已保存或本批次前面的事实: {identity}")
     kind = event["kind"]
+    if __package__:
+        from .teaching import check_adaptive_event, supports_criterion
+    else:
+        from teaching import check_adaptive_event, supports_criterion
+    check_adaptive_event(event, sprint)
     extra = {"prompt", "answer", "result", "feedback"} if kind == "exercise" else {"understanding"} if kind == "understanding" else {"criterion", "outcome"} if kind == "evidence" else set()
     if (set(event) & {"prompt", "answer", "result", "feedback", "understanding", "criterion", "outcome"}) != extra:
         raise LearningError(f"{kind} 专属字段缺失或出现在错误的事实类型上")
@@ -138,7 +143,7 @@ def check_event(event, previous, sprint):
                      item["basis"] == "exercise_verified" and item["result"] != "not_assessed"]
         if not exercises:
             raise LearningError("练习验证结论必须关联已作答并批改的练习")
-        if kind == "evidence" and event["outcome"] == "met" and not any(item["result"] == "correct" for item in exercises):
+        if kind == "evidence" and event["outcome"] == "met" and not any(supports_criterion(item, event["criterion"]) for item in exercises):
             raise LearningError("已验证达标的证据必须关联正确的练习结果")
 
 
@@ -158,7 +163,7 @@ def event_validity(events):
             raise LearningError(f"事实 {identity} 的依赖不存在或尚未按顺序提供")
         superseded_by = replacements.get(identity, [])
         invalidated_by = [key for key in event.get("related_ids", [])
-                          if event["basis"] == "exercise_verified" and validity[key]["status"] != "current"]
+                          if (event["basis"] == "exercise_verified" or event["kind"] == "teaching") and validity[key]["status"] != "current"]
         corrections = set(superseded_by)
         for key in invalidated_by:
             corrections.update(validity[key]["correction_ids"])
@@ -210,6 +215,8 @@ def render_note(record, *, annotate_validity=True):
             lines += [f"### {item['operation_id']} · {item['at']}", "", f"理由：{item['reason']}", "",
                       f"更正事实：{', '.join(item['event_ids'])}", ""]
     for kind, label in LABELS.items():
+        if kind == "teaching" and not any(event["kind"] == kind for event in record["events"]):
+            continue  # Preserve byte-for-byte Phase 2A generated notes.
         lines += [f"## {label}", ""]
         matching = [event for event in record["events"] if event["kind"] == kind]
         if not matching:
@@ -237,6 +244,13 @@ def render_note(record, *, annotate_validity=True):
             for key, title in (("related_ids", "关联事实"), ("supersedes", "修订并替代（原文仍保留）")):
                 if event.get(key):
                     lines += [f"{title}：{', '.join(event[key])}", ""]
+            if "assessment" in event:
+                assessment = event["assessment"]
+                lines += [f"验证形式：{assessment['form']}；错误类型：{assessment['error_type']}", ""]
+                for check in assessment["checks"]:
+                    lines += [f"- {check['criterion']}：{check['outcome']}；{check['reason']}", ""]
+            if "teaching" in event:
+                lines += [f"{key}：{value}" for key, value in event["teaching"].items()] + [""]
             lines += ["引用与摘录：", ""]
             for source in event["sources"]:
                 lines += [f"- {source['ref']}", *[f"  > {line}" for line in source["quote"].splitlines()], ""]
@@ -254,9 +268,11 @@ def prior_completed_revisions(record):
             continue
         checkpoints = record["checkpoints"][:number]
         last = checkpoints[-1]
-        yield {**record, "session_version": 1 if last["kind"] == "finish" else 2,
+        prefix = [events[key] for item in checkpoints for key in item["event_ids"]]
+        version = 3 if any("assessment" in event or "teaching" in event for event in prefix) else 1 if last["kind"] == "finish" else 2
+        yield {**record, "session_version": version,
                "checkpoints": checkpoints, "updated_at": last["at"], "handoff": last["handoff"],
-               "events": [events[key] for item in checkpoints for key in item["event_ids"]]}
+               "events": prefix}
 
 
 class SessionStore:
@@ -298,7 +314,7 @@ class SessionStore:
                         "sprint_id", "sprint_snapshot", "topic", "status", "created_at", "updated_at",
                         "completed_at", "start_request_id", "previous_session_id", "events",
                         "checkpoints", "handoff", "extensions"})
-        if type(record["session_version"]) is not int or record["session_version"] not in (1, 2) or record["kind"] != "session":
+        if type(record["session_version"]) is not int or record["session_version"] not in (1, 2, 3) or record["kind"] != "session":
             raise LearningError("不支持的 Session 版本或类型；不自动迁移")
         if (record["id"], record["goal_id"], record["track_id"]) != (identity, goal, track):
             raise LearningError("Session 身份与所属 Goal/Track 不匹配")
@@ -345,8 +361,8 @@ class SessionStore:
                 raise LearningError("检查点操作重复或类型错误")
             seen.add(checkpoint["operation_id"])
             if kind == "correction":
-                if record["session_version"] != 2 or finished_at is None:
-                    raise LearningError("correction 仅允许在版本 2 已结束 Session 的 finish 之后")
+                if record["session_version"] not in (2, 3) or finished_at is None:
+                    raise LearningError("correction 仅允许在版本 2 或 3 已结束 Session 的 finish 之后")
                 text(checkpoint.get("reason"), "correction.reason", 1200)
                 correction_count += 1
             elif finished_at is not None or "reason" in checkpoint:
@@ -381,7 +397,10 @@ class SessionStore:
             raise LearningError("当前交接与最后检查点不一致")
         if (finished_at is not None) != (record["status"] == "completed") or record["completed_at"] != finished_at:
             raise LearningError("Session 完成状态与结束检查点不一致")
-        if (record["session_version"] == 2) != bool(correction_count):
+        adaptive = any("assessment" in event or "teaching" in event for event in record["events"])
+        if (record["session_version"] == 3) != adaptive:
+            raise LearningError("Phase 2B 教学字段必须使用版本 3；读取不会自动迁移")
+        if record["session_version"] != 3 and (record["session_version"] == 2) != bool(correction_count):
             raise LearningError("版本 2 必须保留至少一条结束后更正；版本 1 不接受该扩展")
         fields(record["extensions"], {"knowledge_ids", "review_candidates"})
         for key, value in record["extensions"].items():
@@ -621,8 +640,10 @@ class SessionStore:
                                            "at": stamp, "event_ids": [item["id"] for item in payload["events"]],
                                            "handoff": copy.deepcopy(payload["handoff"]), "digest": digest(payload)})
             if correction:
-                record["session_version"] = 2
+                record["session_version"] = max(2, record["session_version"])
                 record["checkpoints"][-1]["reason"] = payload["reason"]
+            if any("assessment" in event or "teaching" in event for event in payload["events"]):
+                record["session_version"] = 3
             if finish:
                 record["status"], record["completed_at"] = "completed", stamp
             self.check_record(record, goal, track, identity, state)
@@ -655,7 +676,14 @@ class SessionStore:
         # Only explicit exercise-backed evidence qualifies; explanations and
         # self-reports remain visible with their original basis.
         verified = [item for item in focus if item["kind"] == "evidence" and item["basis"] == "exercise_verified" and item["outcome"] == "met"]
+        if __package__:
+            from .teaching import coverage
+        else:
+            from teaching import coverage
+        settings = [event for key, event in events.items() if event["kind"] == "teaching" and validity[key]["status"] == "current"]
         return {**self.result(record), "handoff": handoff, "focus": focus,
+                "teaching_state": copy.deepcopy(settings[-1]["teaching"]) if settings else None,
+                "criteria_evidence": coverage([record], record["sprint_snapshot"]),
                 "verified_abilities": verified,
                 "unstable_points": [item for item in focus if item["kind"] == "weakness"],
                 "unresolved_questions": [item for item in focus if item["kind"] == "unresolved"],
@@ -775,6 +803,13 @@ class SessionStore:
 
 
 def add_commands(commands):
+    teaching = commands.add_parser("teaching-context", help="只读的教学起点、模式和逐项验收证据")
+    teaching.add_argument("--goal")
+    teaching.add_argument("--track")
+    teaching.add_argument("--session")
+    teaching.add_argument("--sprint")
+    teaching.add_argument("--topic")
+    teaching.add_argument("--limit", type=int, default=10)
     for name in ("session-start", "session-checkpoint", "session-finish", "session-correct", "session-resume",
                  "session-context", "session-list", "session-show", "session-repair"):
         command = commands.add_parser(name)
@@ -797,6 +832,12 @@ def add_commands(commands):
 
 def run(store, args):
     name = args.command
+    if name == "teaching-context":
+        if __package__:
+            from .teaching import context
+        else:
+            from teaching import context
+        return context(store, args.goal, args.track, args.session, args.sprint, args.topic, args.limit)
     if name == "session-start":
         return store.start(args.goal, args.track, args.topic, args.request_id, args.sprint, args.from_session)
     if name in {"session-checkpoint", "session-finish"}:

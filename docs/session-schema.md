@@ -2,6 +2,8 @@
 
 实现位于 `scripts/sessions.py`，由 `scripts/learning.py` 统一提供 JSON CLI，只使用 Python 标准库。Agent 工作流和可运行示例见 [session.md](../references/session.md)。
 
+Phase 2B 的教学事件、分项练习批改与 `session_version=3` 增量扩展见 [teaching-schema.md](teaching-schema.md)。下述 v1/v2 规则继续适用于未使用教学扩展的记录；v3 复用同一追加、纠错、幂等与原子提交机制。
+
 ## 文件与权威来源
 
 ```text
@@ -113,4 +115,4 @@ validate 全库只读检查结构、范围、历史摘要、引用、状态、�
 
 ## Phase 2B 接口
 
-可通过 session-context 获取交接、session-list / session-show 分页取证、批量 checkpoint 追加观察，按独立 transition 提交用户授权的规划转换。保留事实 ID、sources、basis、Sprint 快照和 knowledge_ids/review_candidates；后续画像、共享知识或复习引擎需有自己的版本与授权边界，不得改写原始事实。
+可通过 session-context 获取交接、teaching-context 读取教学状态与逐项验收证据、session-list / session-show 分页取证、批量 checkpoint 追加观察，按独立 transition 提交用户授权的规划转换。保留事实 ID、sources、basis、Sprint 快照和 knowledge_ids/review_candidates；后续画像、共享知识或复习引擎需有自己的版本与授权边界，不得改写原始事实。

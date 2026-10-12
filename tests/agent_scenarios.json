@@ -1,0 +1,159 @@
+{
+  "arraylist": {
+    "title": "Java ArrayList",
+    "level": "已有 Java 集合基础，能解释常用操作和扩容；异常边界和复制成本仍不稳定",
+    "criteria": [
+      "解释 ArrayList 基本操作、size 和容量",
+      "解释扩容和均摊复杂度",
+      "区分索引越界与空指针异常",
+      "分析批量复制和插入复杂度",
+      "独立实现并运行综合案例"
+    ],
+    "history": true,
+    "turns": [
+      {
+        "user": "继续学习 ArrayList，记录到当前 Sprint。我已经会基本操作和扩容。今天从实际案例开始，先给我一个覆盖异常边界和批量复制的综合任务。",
+        "checks": {
+          "session": "active"
+        }
+      },
+      {
+        "user": "我用自己的代码作答，你按这个批改：var xs = new ArrayList<String>(10); xs.add(\"a\"); xs.add(null);。size 是 2，容量至少 10。xs.get(2) 会抛 NullPointerException；xs.get(1).length() 也会抛 NullPointerException。我觉得 System.arraycopy 复制 m 个元素是 O(1)，因为只调用一次方法。",
+        "checks": {
+          "gaps": [
+            "区分索引越界与空指针异常",
+            "分析批量复制和插入复杂度"
+          ]
+        }
+      },
+      {
+        "user": "修正：get(2) 的索引等于 size，先越界，应为 IndexOutOfBoundsException；get(1) 本身得到 null，调用 length() 才空指针。复制 m 个元素要 O(m)；向中间插入这 m 个元素还需移动尾部 k 个元素，所以 O(m+k)，最坏 O(m+n)。这组到这里，请保存本组结果并说明还有哪些能力没验证。",
+        "checks": {
+          "verified": [
+            "区分索引越界与空指针异常",
+            "分析批量复制和插入复杂度"
+          ],
+          "session": "active"
+        }
+      },
+      {
+        "user": "换个实际例子：订单列表预留容量 100 但还没添加订单时 size=0；get(0) 仍然越界。追加一批 m 条订单用 addAll，不能把一次调用说成 O(1)。每次追加通常常数成本，扩容那次要复制旧元素；多次追加按几何扩容累计摊销才是 O(1)。请评价我的这些判断，后面用更综合的案例。",
+        "checks": {
+          "verified": [
+            "解释 ArrayList 基本操作、size 和容量",
+            "解释扩容和均摊复杂度"
+          ]
+        }
+      },
+      {
+        "user": "我刚才把 size 口头说成数组长度，我指的是有效元素数量，不是底层数组的容量；容量 100 的空列表 size 还是 0。这个只是措辞问题。讲快一点，先不讲原理，直接给一个订单列表 Demo。",
+        "checks": {
+          "mode": "quick",
+          "pace": "fast"
+        }
+      },
+      {
+        "user": "现在深入讲一下为什么追加均摊 O(1)，单次扩容却可能 O(n)，用一个具体扩容序列解释。我希望理解背后的原理。",
+        "checks": {
+          "mode": "deep",
+          "depth": "deep"
+        }
+      },
+      {
+        "user": "我还是不理解为什么每次成本不同却能平均成常数。详细一点，逐步带我看这个卡点，暂时不用给我题。",
+        "checks": {
+          "mode": "guided",
+          "exercise_policy": "declined"
+        }
+      },
+      {
+        "user": "今天不做练习了，只总结当前 Sprint 每项验收标准的证据状态；没独立验证的请如实标记。先别结束。",
+        "checks": {
+          "exercise_policy": "declined",
+          "session": "active",
+          "unverified": [
+            "独立实现并运行综合案例"
+          ]
+        }
+      },
+      {
+        "user": "今天到这里，结束并保存。没做运行验证的部分以后补，我现在不改错也不继续做题。",
+        "checks": {
+          "session": "completed",
+          "sprint": "active",
+          "unverified": [
+            "独立实现并运行综合案例"
+          ]
+        }
+      },
+      {
+        "fresh": true,
+        "user": "继续上次 ArrayList 学习。先告诉我上次采用的讲解深度、难度和遗留问题。沿用不做练习的选择，继续讲解即可，请记录。",
+        "checks": {
+          "session": "active",
+          "mode": "guided",
+          "exercise_policy": "declined",
+          "unverified": [
+            "独立实现并运行综合案例"
+          ]
+        }
+      },
+      {
+        "user": "这次只看了讲解，没有新增实践。结束并保存。",
+        "checks": {
+          "session": "completed",
+          "sprint": "active"
+        }
+      }
+    ]
+  },
+  "mysql": {
+    "title": "MySQL 查询与索引",
+    "level": "会 SELECT 和基础 JOIN",
+    "criteria": [
+      "写出分组统计 SQL",
+      "根据 EXPLAIN 分析索引选择"
+    ],
+    "turns": [
+      {
+        "user": "开始学习并记录。我会 SELECT 和 JOIN，今天用 Practice 模式。请给一个订单统计的综合实战，包含 SQL 编写和执行计划分析，提供必要的表结构和样本执行计划。",
+        "checks": {
+          "session": "active",
+          "mode": "practice"
+        }
+      }
+    ]
+  },
+  "english": {
+    "title": "英语职场表达",
+    "level": "能表达简单工作请求",
+    "criteria": [
+      "在请假场景礼貌表达请求",
+      "根据对象调整语气"
+    ],
+    "turns": [
+      {
+        "user": "开始学习并记录。今天练英语，给我一个向主管请假的交流场景，我想试着表达，再根据语气改写，不想背语法定义。",
+        "checks": {
+          "session": "active"
+        }
+      }
+    ]
+  },
+  "theory": {
+    "title": "缓存一致性理论",
+    "level": "了解数据库与缓存的基础概念",
+    "criteria": [
+      "用时序案例解释缓存不一致",
+      "分析一致性与性能的取舍"
+    ],
+    "turns": [
+      {
+        "user": "开始学习并记录。我了解数据库和缓存，不做前置水平测试，直接从并发更新下的缓存不一致开始，给我一个真实业务案例来分析。",
+        "checks": {
+          "session": "active"
+        }
+      }
+    ]
+  }
+}

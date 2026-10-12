@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "kind": "goal",
+  "id": "demo",
+  "title": "Java ArrayList",
+  "status": "active",
+  "created_at": "2026-10-11T14:49:54.117588+00:00",
+  "updated_at": "2026-10-11T14:49:54.117608+00:00",
+  "extensions": {},
+  "profile": {
+    "description": "",
+    "level": "已有 Java 集合基础，能解释常用操作和扩容；异常边界和复制成本仍不稳定",
+    "motivation": "",
+    "ability": ""
+  },
+  "history": [
+    {
+      "at": "2026-10-11T14:49:54.117608+00:00",
+      "kind": "goal",
+      "id": "demo",
+      "event": "create",
+      "note": "创建学习目标",
+      "before": null,
+      "after": {
+        "description": "",
+        "level": "已有 Java 集合基础，能解释常用操作和扩容；异常边界和复制成本仍不稳定",
+        "motivation": "",
+        "ability": ""
+      }
+    }
+  ]
+}

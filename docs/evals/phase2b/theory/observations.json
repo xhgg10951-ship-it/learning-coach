@@ -1,0 +1,74 @@
+[
+  {
+    "turn": 1,
+    "active_session_id": "SE-6449701f42524b789255550a8ca4f275",
+    "teaching_state": {
+      "mode": "practice",
+      "pace": "balanced",
+      "depth": "standard",
+      "exercise_policy": "allowed",
+      "difficulty": "以已有数据库和缓存基础为起点，分析两个改价请求的数据库提交与缓存写入交错，并讨论详情页和订单的性能与一致性取舍。",
+      "reason": "用户自报基础并明确拒绝前置水平测试，同时主动要求真实业务案例分析；直接按其指定主题安排一项综合案例，尚未据此认定掌握。",
+      "source": {
+        "session_id": "SE-6449701f42524b789255550a8ca4f275",
+        "event_id": "case-practice-mode",
+        "at": "2026-10-11T08:55:46.973838+00:00",
+        "basis": "user_report",
+        "text": "按本轮指定起点直接采用业务案例分析，省略数据库与缓存基础讲解及前置水平测试。基础仅属自报，尚无独立能力证据。",
+        "sources": [
+          {
+            "ref": "agent-turn-01.json#/user",
+            "quote": "开始学习并记录。我了解数据库和缓存，不做前置水平测试，直接从并发更新下的缓存不一致开始，给我一个真实业务案例来分析。"
+          }
+        ]
+      }
+    },
+    "sprint_status": "active",
+    "criteria": [
+      {
+        "criterion": "用时序案例解释缓存不一致",
+        "status": "unverified",
+        "decisive_evidence": null
+      },
+      {
+        "criterion": "分析一致性与性能的取舍",
+        "status": "unverified",
+        "decisive_evidence": null
+      }
+    ],
+    "history": {
+      "scope": "selected_track_only",
+      "selected_ids": [
+        "SE-6449701f42524b789255550a8ca4f275"
+      ],
+      "omitted_sessions": 0,
+      "complete": true,
+      "index_status": "current"
+    },
+    "sessions": [
+      {
+        "id": "SE-6449701f42524b789255550a8ca4f275",
+        "status": "active",
+        "event_count": 3,
+        "checkpoint_count": 1,
+        "teaching_state": {
+          "mode": "practice",
+          "pace": "balanced",
+          "depth": "standard",
+          "exercise_policy": "allowed",
+          "difficulty": "以已有数据库和缓存基础为起点，分析两个改价请求的数据库提交与缓存写入交错，并讨论详情页和订单的性能与一致性取舍。",
+          "reason": "用户自报基础并明确拒绝前置水平测试，同时主动要求真实业务案例分析；直接按其指定主题安排一项综合案例，尚未据此认定掌握。"
+        },
+        "handoff": {
+          "summary": "本轮为隔离验收环境的合成学生教学记录。学生明确开始跟踪，自报数据库和缓存基础并拒绝前置测试。已按指定起点开始并发缓存不一致学习，提供电商双请求改价的完整时序及业务约束，采用 Practice 案例分析；尚无学生作答或验证结论，Session 保持 active。",
+          "next_step": "等待学生对当前单一案例作出分析，再按时序推理和一致性性能取舍分别反馈；不追加前置水平测试，不代替学生作答。学生可调整深度或停止。",
+          "focus_ids": [
+            "starting-point",
+            "case-practice-mode",
+            "concurrent-price-case"
+          ]
+        }
+      }
+    ]
+  }
+]

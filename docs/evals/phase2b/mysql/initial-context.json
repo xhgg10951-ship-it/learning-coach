@@ -1,0 +1,108 @@
+{
+  "goal": {
+    "id": "demo",
+    "title": "MySQL 查询与索引",
+    "status": "active"
+  },
+  "track": {
+    "id": "core",
+    "title": "MySQL 查询与索引",
+    "status": "active"
+  },
+  "profiles": {
+    "common": "# 合成学生测试画像\n已有相关基础，偏好实际任务；所有内容为验收夹具，不是实际用户学习记录。\n",
+    "goal": {
+      "description": "",
+      "level": "会 SELECT 和基础 JOIN",
+      "motivation": "",
+      "ability": ""
+    },
+    "goal_notes": "# MySQL 查询与索引\n\nID: `demo`\n\n画像字段和状态以 state.json 为准。此处保留偏好、补充背景和用户提供的原始说明。\n\n## 补充画像\n\n## 用户反馈\n",
+    "track_notes": "# MySQL 查询与索引\n\nID: `core`\n\n状态、依赖和能力验收以 state.json 为准。\n\n## 粗略能力方向\n\n## 资料\n\n## 用户反馈\n"
+  },
+  "current_milestone": {
+    "schema_version": 2,
+    "kind": "milestone",
+    "id": "M001",
+    "title": "应用能力",
+    "status": "active",
+    "created_at": "2026-10-11T08:49:34.406125+00:00",
+    "updated_at": "2026-10-11T08:49:34.406125+00:00",
+    "extensions": {},
+    "objective": "MySQL 查询与索引",
+    "criteria": [
+      "写出分组统计 SQL",
+      "根据 EXPLAIN 分析索引选择"
+    ],
+    "estimated_hours": 30
+  },
+  "current_sprint": {
+    "schema_version": 2,
+    "kind": "sprint",
+    "id": "SP001",
+    "title": "MySQL 查询与索引",
+    "status": "active",
+    "created_at": "2026-10-11T08:49:34.513294+00:00",
+    "updated_at": "2026-10-11T08:49:34.513294+00:00",
+    "extensions": {},
+    "objective": "MySQL 查询与索引",
+    "criteria": [
+      "写出分组统计 SQL",
+      "根据 EXPLAIN 分析索引选择"
+    ],
+    "estimated_hours": 5,
+    "milestone_id": "M001"
+  },
+  "topic": null,
+  "learning_allowed": true,
+  "active_session_id": null,
+  "teaching_state": {
+    "mode": "adaptive",
+    "pace": "balanced",
+    "depth": "standard",
+    "exercise_policy": "allowed",
+    "difficulty": "尚无教学难度记录",
+    "reason": "依据画像、真实证据和用户本次选择确定起点；不默认从零开始。",
+    "source": null
+  },
+  "criteria": [
+    {
+      "criterion": "写出分组统计 SQL",
+      "status": "unverified",
+      "decisive_evidence": null,
+      "evidence": []
+    },
+    {
+      "criterion": "根据 EXPLAIN 分析索引选择",
+      "status": "unverified",
+      "decisive_evidence": null,
+      "evidence": []
+    }
+  ],
+  "verified_abilities": [],
+  "remaining_gaps": [
+    "写出分组统计 SQL",
+    "根据 EXPLAIN 分析索引选择"
+  ],
+  "exercises": [],
+  "weaknesses_and_unresolved": [],
+  "sessions": [],
+  "history": {
+    "scope": "selected_track_only",
+    "selected_ids": [],
+    "omitted_sessions": 0,
+    "complete": true,
+    "index_status": "empty"
+  },
+  "recommendation": {
+    "practice": "user_choice",
+    "avoid_basic_repetition": [],
+    "target_gaps": [
+      "写出分组统计 SQL",
+      "根据 EXPLAIN 分析索引选择"
+    ],
+    "may_suggest_sprint_completion": false,
+    "reason": "仅根据有效独立证据；缺少证据不等于能力不足。时长、题数、讲解次数不参与判断。",
+    "lifecycle_action": "none"
+  }
+}

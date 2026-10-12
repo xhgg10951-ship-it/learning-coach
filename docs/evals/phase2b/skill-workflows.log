@@ -1,0 +1,7 @@
+test_documented_workflows_execute_in_an_isolated_hub (test_skill.SkillWorkflowTests.test_documented_workflows_execute_in_an_isolated_hub) ... ok
+test_local_references_are_reachable_and_resolve (test_skill.SkillWorkflowTests.test_local_references_are_reachable_and_resolve) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 37.764s
+
+OK
